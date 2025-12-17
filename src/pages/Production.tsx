@@ -78,22 +78,22 @@ const Production: React.FC = () => {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   
   // Filtros
-  const [showFilters, setShowFilters] = useState(false); // Painel de filtros avançado
-  const [activeTabFilter, setActiveTabFilter] = useState('Todos'); // Pills de status
-  const [filterClient, setFilterClient] = useState('Todos'); // Dropdown de cliente
+  const [showFilters, setShowFilters] = useState(false); 
+  const [activeTabFilter, setActiveTabFilter] = useState('Todos'); 
+  const [filterClient, setFilterClient] = useState('Todos'); 
   const [searchTerm, setSearchTerm] = useState('');
 
   const [newOrder, setNewOrder] = useState({ order_number: '', client_id: '', product_name: '', quantity: 0 });
 
   const stageColumns = [
-    { key: 'modeling', label: 'Modelagem', short: 'Mod', category: 'Modelagem' },
-    { key: 'cut', label: 'Corte', short: 'Cor', category: 'Corte' },
-    { key: 'sew', label: 'Costura', short: 'Cos', category: 'Costura' },
-    { key: 'embroidery', label: 'Bordado', short: 'Bor', category: 'Bordado' },
-    { key: 'silk', label: 'Silk', short: 'Sil', category: 'Estampa Silk' },
-    { key: 'dtf_print', label: 'DTF Print', short: 'Prt', category: 'Impressão DTF' },
-    { key: 'dtf_press', label: 'DTF Press', short: 'Pre', category: 'Prensa DTF' },
-    { key: 'finish', label: 'Acabamento', short: 'Aca', category: 'Acabamento' },
+    { key: 'modeling', label: 'Modelagem', category: 'Modelagem' },
+    { key: 'cut', label: 'Corte', category: 'Corte' },
+    { key: 'sew', label: 'Costura', category: 'Costura' },
+    { key: 'embroidery', label: 'Bordado', category: 'Bordado' },
+    { key: 'silk', label: 'Silk', category: 'Estampa Silk' },
+    { key: 'dtf_print', label: 'DTF Print', category: 'Impressão DTF' },
+    { key: 'dtf_press', label: 'DTF Press', category: 'Prensa DTF' },
+    { key: 'finish', label: 'Acabamento', category: 'Acabamento' },
   ];
 
   const fetchData = useCallback(async () => {
@@ -135,20 +135,17 @@ const Production: React.FC = () => {
 
   // --- Lógica de Filtragem ---
   const filteredOrders = orders.filter(order => {
-    // 1. Busca Texto
     const matchesSearch = 
       order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (order.clients?.company_name || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-    // 2. Filtro de Tab (Status Geral)
     let matchesTab = true;
     if (activeTabFilter !== 'Todos') {
       if (!order.stages) matchesTab = false;
       else matchesTab = Object.values(order.stages).some((stage: any) => stage.status === activeTabFilter);
     }
 
-    // 3. Filtro de Cliente (Novo)
     const matchesClient = filterClient === 'Todos' || order.client_id === filterClient;
 
     return matchesSearch && matchesTab && matchesClient;
@@ -180,22 +177,20 @@ const Production: React.FC = () => {
     XLSX.writeFile(workbook, "Relatorio_Producao_SowBrand.xlsx");
   };
 
-  // --- Lógica de Impressão com Nome Dinâmico ---
+  // --- Lógica de Impressão ---
   const handlePrint = () => {
     const originalTitle = document.title;
-    let fileName = 'Relatorio_Producao_Geral';
+    let fileName = 'Relatorio_Producao';
 
-    // Se estiver filtrando por um cliente específico, muda o nome do arquivo
     if (filterClient !== 'Todos') {
         const clientName = clients.find(c => c.id === filterClient)?.company_name || 'Cliente';
-        // Remove caracteres especiais para o nome do arquivo
         const safeName = clientName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        fileName = `Relatorio_Producao_${safeName}`;
+        fileName = `Relatorio_${safeName}`;
     }
 
-    document.title = fileName; // Muda o título (o navegador usa isso como nome do arquivo PDF)
+    document.title = fileName;
     window.print();
-    document.title = originalTitle; // Restaura o título original
+    document.title = originalTitle;
   };
 
   const toggleRow = (id: string) => {
@@ -203,11 +198,21 @@ const Production: React.FC = () => {
     else setExpandedOrderId(id);
   };
 
+  // --- Helpers de Formatação Visual ---
+
   const getStatusColor = (status: string | undefined) => {
     if (status === 'OK') return 'bg-green-500';
     if (status === 'Atras.') return 'bg-red-500';
     if (status === 'Andam.') return 'bg-blue-500';
     return 'bg-gray-200';
+  };
+
+  // Transforma "Andam." em "Andamento" para o relatório
+  const getFullStatusName = (status: string | undefined) => {
+    if (status === 'Andam.') return 'Andamento';
+    if (status === 'Atras.') return 'Atrasado';
+    if (status === 'OK') return 'Concluído';
+    return status || 'Pendente';
   };
 
   const formatDateBR = (dateStr: string | undefined) => {
@@ -227,22 +232,75 @@ const Production: React.FC = () => {
     <div className="space-y-6">
       <style>{`
         @media print {
-          @page { size: landscape; margin: 10mm; }
+          /* MUDANÇA: Layout Retrato (Portrait) para ficar igual celular */
+          @page { size: portrait; margin: 10mm; }
           body { background: white; -webkit-print-color-adjust: exact; }
+          
           .ui-only, nav, header, aside, button, input { display: none !important; }
-          #print-report-container { display: block !important; width: 100%; position: absolute; top: 0; left: 0; }
-          .report-header { border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-          .report-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; } 
-          .report-card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; page-break-inside: avoid; background: #fff; }
-          .report-card-header { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-          .report-stages-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-          .report-stage-box { border: 1px solid #eee; padding: 4px; border-radius: 4px; text-align: center; }
+          
+          #print-report-container { 
+            display: block !important; 
+            width: 100%; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+          }
+          
+          .report-header { 
+            border-bottom: 2px solid #000; 
+            padding-bottom: 15px; 
+            margin-bottom: 25px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: flex-end; 
+          }
+          
+          /* MUDANÇA: Grid de 1 coluna para ocupar bem a folha vertical */
+          .report-grid { 
+            display: grid; 
+            grid-template-columns: 1fr; /* Um pedido por linha */
+            gap: 20px; 
+          } 
+          
+          .report-card { 
+            border: 1px solid #ccc; 
+            border-radius: 8px; 
+            padding: 15px; 
+            page-break-inside: avoid; /* Não quebra o card no meio */
+            background: #fff; 
+            box-shadow: none;
+          }
+          
+          .report-card-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            margin-bottom: 12px; 
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee; 
+          }
+          
+          /* MUDANÇA: Grid de Etapas com 2 colunas para caber texto inteiro */
+          .report-stages-grid { 
+            display: grid; 
+            grid-template-columns: repeat(2, 1fr); /* 2 colunas */
+            gap: 10px; 
+          }
+          
+          .report-stage-box { 
+            border: 1px solid #f0f0f0; 
+            padding: 8px 12px; 
+            border-radius: 6px; 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
         }
       `}</style>
 
       {/* --- ÁREA DE TRABALHO (UI) --- */}
       <div className="ui-only">
-        {/* Linha Superior: Busca e Botões */}
+        {/* Linha Superior */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
           <div className="relative w-full md:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -255,18 +313,16 @@ const Production: React.FC = () => {
           </div>
           
           <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
-            <button 
-              onClick={() => setShowFilters(!showFilters)}
-              className={`px-3 py-2 border rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap ${showFilters ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
-            >
+            <button onClick={() => setShowFilters(!showFilters)} className={`px-3 py-2 border rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap ${showFilters ? 'bg-gray-100' : 'hover:bg-gray-50'}`}>
               <Filter size={16}/> <span className="hidden sm:inline">Filtros</span>
             </button>
 
             <button onClick={exportToExcel} className="px-3 py-2 border border-green-200 text-green-700 bg-green-50 rounded-lg flex items-center gap-2 hover:bg-green-100 whitespace-nowrap">
               <Download size={16}/> <span className="hidden sm:inline">Excel</span>
             </button>
+            {/* CORREÇÃO ITEM 2: Nome do botão agora é só "PDF" */}
             <button onClick={handlePrint} className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg flex items-center gap-2 hover:bg-gray-50 whitespace-nowrap">
-              <Printer size={16}/> <span className="hidden sm:inline">PDF Cliente</span>
+              <Printer size={16}/> <span className="hidden sm:inline">PDF</span>
             </button>
             <button onClick={() => setIsModalOpen(true)} className="bg-sow-green text-sow-dark px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:brightness-90 whitespace-nowrap">
               <Plus size={18}/> Novo
@@ -274,32 +330,25 @@ const Production: React.FC = () => {
           </div>
         </div>
 
-        {/* Painel de Filtros (Expansível) */}
+        {/* Painel Filtros */}
         {showFilters && (
           <div className="bg-white p-4 mb-4 rounded-lg border border-gray-200 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Filtrar por Cliente</label>
-              <select 
-                className="w-full p-2 border rounded text-sm bg-white"
-                value={filterClient}
-                onChange={(e) => setFilterClient(e.target.value)}
-              >
+              <select className="w-full p-2 border rounded text-sm bg-white" value={filterClient} onChange={(e) => setFilterClient(e.target.value)}>
                 <option value="Todos">Todos os Clientes (Geral)</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.company_name || c.name}</option>)}
               </select>
             </div>
             <div className="flex items-end">
-              <button 
-                onClick={() => { setFilterClient('Todos'); setActiveTabFilter('Todos'); setSearchTerm(''); }}
-                className="px-4 py-2 text-red-500 text-sm font-bold hover:bg-red-50 rounded-lg flex items-center gap-2"
-              >
+              <button onClick={() => { setFilterClient('Todos'); setActiveTabFilter('Todos'); setSearchTerm(''); }} className="px-4 py-2 text-red-500 text-sm font-bold hover:bg-red-50 rounded-lg flex items-center gap-2">
                 <X size={16}/> Limpar Filtros
               </button>
             </div>
           </div>
         )}
 
-        {/* Filtros Rápidos (Pills) */}
+        {/* Filtros Rápidos */}
         <div className="flex gap-2 overflow-x-auto pb-4 custom-scrollbar">
           {[
             { label: 'Todos', val: 'Todos', icon: Filter },
@@ -307,67 +356,57 @@ const Production: React.FC = () => {
             { label: 'Em Andamento', val: 'Andam.', icon: Clock, color: 'bg-blue-100 text-blue-700 border-blue-200' },
             { label: 'Concluídos', val: 'OK', icon: CheckCircle, color: 'bg-green-100 text-green-700 border-green-200' },
           ].map(filter => (
-            <button
-              key={filter.val}
-              onClick={() => setActiveTabFilter(filter.val)}
+            <button key={filter.val} onClick={() => setActiveTabFilter(filter.val)}
               className={`px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 border transition-all whitespace-nowrap ${
-                activeTabFilter === filter.val 
-                  ? 'bg-sow-dark text-white border-sow-dark' 
-                  : filter.color || 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                activeTabFilter === filter.val ? 'bg-sow-dark text-white border-sow-dark' : filter.color || 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
               }`}
             >
-              {filter.icon && <filter.icon size={14} />}
-              {filter.label}
+              {filter.icon && <filter.icon size={14} />} {filter.label}
             </button>
           ))}
         </div>
 
-        {/* Lista Accordion */}
+        {/* Lista Accordion (Visão do Gestor) */}
         <div className="space-y-3">
-          {filteredOrders.length === 0 && (
-            <div className="text-center text-gray-500 py-10 bg-gray-50 rounded border border-dashed">
-              Nenhum pedido encontrado para o cliente/filtro selecionado.
-            </div>
-          )}
+          {filteredOrders.length === 0 && <div className="text-center text-gray-500 py-10 bg-gray-50 rounded border border-dashed">Nenhum pedido encontrado.</div>}
 
           {filteredOrders.map((order) => {
             const isExpanded = expandedOrderId === order.id;
             return (
               <div key={order.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                <div 
-                  onClick={() => toggleRow(order.id)}
-                  className="p-4 flex flex-col md:flex-row items-center justify-between gap-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                >
+                <div onClick={() => toggleRow(order.id)} className="p-4 flex flex-col md:flex-row items-center justify-between gap-4 cursor-pointer hover:bg-gray-50 transition-colors">
+                  
+                  {/* Esquerda: Info */}
                   <div className="flex items-center gap-4 w-full md:w-1/4 shrink-0">
-                    <div className={`p-2 rounded-lg font-bold text-sm bg-gray-100 text-sow-dark border border-gray-200 whitespace-nowrap`}>
-                      {order.order_number}
-                    </div>
+                    <div className={`p-2 rounded-lg font-bold text-sm bg-gray-100 text-sow-dark border border-gray-200 whitespace-nowrap`}>{order.order_number}</div>
                     <div className="overflow-hidden">
                       <h3 className="font-bold text-gray-900 text-sm truncate">{order.product_name}</h3>
                       <p className="text-xs text-gray-500 truncate">{order.clients?.company_name || 'Cliente S/ Nome'}</p>
                     </div>
                   </div>
 
-                  <div className="flex-1 flex items-center justify-center gap-4 overflow-x-auto w-full">
+                  {/* Centro: Bolinhas (CORREÇÃO ITEM 1) */}
+                  <div className="flex-1 flex items-center justify-center gap-6 overflow-x-auto w-full px-4">
                     {stageColumns.map(stage => {
                       const status = order.stages?.[stage.key as keyof typeof order.stages]?.status;
                       return (
-                        <div key={stage.key} className="flex flex-col items-center gap-1 min-w-[30px]">
+                        <div key={stage.key} className="flex flex-col items-center gap-2 min-w-[50px]">
+                          {/* Bolinha Maior (w-4 h-4) */}
                           <div className={`w-4 h-4 rounded-full ${getStatusColor(status)} shadow-sm`} title={`${stage.label}: ${status || 'Pendente'}`}></div>
-                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter">{stage.short}</span>
+                          {/* Texto Completo */}
+                          <span className="text-[9px] text-gray-500 font-bold uppercase tracking-tight text-center">{stage.label}</span>
                         </div>
                       );
                     })}
                   </div>
 
+                  {/* Direita: Qtd */}
                   <div className="flex items-center gap-6 md:justify-end w-full md:w-auto shrink-0">
                     <div className="text-right">
                       <span className="text-[10px] text-gray-400 uppercase font-bold block">Qtd</span>
                       <span className="font-bold text-lg">{order.quantity}</span>
                     </div>
-                    <div>
-                      {isExpanded ? <ChevronUp size={20} className="text-gray-400"/> : <ChevronDown size={20} className="text-gray-400"/>}
-                    </div>
+                    <div>{isExpanded ? <ChevronUp size={20} className="text-gray-400"/> : <ChevronDown size={20} className="text-gray-400"/>}</div>
                   </div>
                 </div>
 
@@ -383,27 +422,12 @@ const Production: React.FC = () => {
                               {stageData?.status === 'Atras.' && <AlertCircle size={12} className="text-red-500"/>}
                             </p>
                             <div className="space-y-2">
-                              <EditableSupplierCell 
-                                current={stageData?.provider} 
-                                category={stage.category}
-                                stageKey={stage.key}
-                                suppliers={suppliers}
-                                onUpdate={(val) => updateOrderStage(order.id, stage.key, 'provider', val)}
-                              />
+                              <EditableSupplierCell current={stageData?.provider} category={stage.category} stageKey={stage.key} suppliers={suppliers} onUpdate={(val) => updateOrderStage(order.id, stage.key, 'provider', val)} />
                               <div className="flex gap-2">
-                                <EditableDateCell 
-                                  date={stageData?.date_in}
-                                  onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_in', val)}
-                                />
-                                <EditableDateCell 
-                                  date={stageData?.date_out}
-                                  onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_out', val)}
-                                />
+                                <EditableDateCell date={stageData?.date_in} onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_in', val)} />
+                                <EditableDateCell date={stageData?.date_out} onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_out', val)} />
                               </div>
-                              <EditableStatusCell 
-                                status={stageData?.status}
-                                onUpdate={(val) => updateOrderStage(order.id, stage.key, 'status', val)}
-                              />
+                              <EditableStatusCell status={stageData?.status} onUpdate={(val) => updateOrderStage(order.id, stage.key, 'status', val)} />
                             </div>
                           </div>
                         );
@@ -417,51 +441,57 @@ const Production: React.FC = () => {
         </div>
       </div>
 
-      {/* --- ÁREA DE RELATÓRIO PDF --- */}
+      {/* --- ÁREA DE RELATÓRIO PDF (RETRATO / MOBILE FRIENDLY) --- */}
       <div id="print-report-container" className="hidden">
         <div className="report-header">
           <div>
-            <h1 className="text-2xl font-bold uppercase tracking-wide">
-              {/* Título Dinâmico do Relatório */}
-              Relatório de Produção {filterClient !== 'Todos' ? ` - ${clients.find(c => c.id === filterClient)?.company_name}` : ''}
+            <h1 className="text-2xl font-bold uppercase tracking-wide text-sow-dark">
+              Relatório de Produção
             </h1>
-            <p className="text-sm text-gray-500">Sow Brand Manager</p>
+            <p className="text-sm text-gray-500 font-bold">{filterClient !== 'Todos' ? clients.find(c => c.id === filterClient)?.company_name : 'Geral'}</p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-gray-400">Gerado em</p>
-            <p className="font-bold">{new Date().toLocaleDateString()}</p>
+            <p className="text-xs text-gray-400">Data do Relatório</p>
+            <p className="font-bold text-lg">{new Date().toLocaleDateString()}</p>
           </div>
         </div>
 
         <div className="report-grid">
           {filteredOrders.map(order => (
             <div key={order.id} className="report-card">
+              {/* Header do Card (Cliente + Info) */}
               <div className="report-card-header">
                 <div>
-                  <span className="text-xs font-bold bg-black text-white px-2 py-0.5 rounded">{order.order_number}</span>
-                  <span className="text-sm font-bold ml-2">{order.product_name}</span>
+                  <div className="text-xs text-gray-400 font-bold uppercase mb-1">{order.clients?.company_name}</div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold bg-black text-white px-2 py-0.5 rounded">{order.order_number}</span>
+                    <span className="text-base font-bold text-gray-800">{order.product_name}</span>
+                  </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs text-gray-500">Qtd: </span>
-                  <span className="font-bold text-sm">{order.quantity}</span>
+                  <span className="text-xs text-gray-500 block">Quantidade</span>
+                  <span className="font-bold text-xl">{order.quantity}</span>
                 </div>
               </div>
-              <div className="mb-2 text-xs text-gray-500 font-bold uppercase tracking-wider">{order.clients?.company_name}</div>
 
+              {/* Lista de Etapas (2 Colunas para caber textos inteiros) */}
               <div className="report-stages-grid">
                 {stageColumns.map(stage => {
                   const sData = order.stages?.[stage.key as keyof typeof order.stages];
                   const status = sData?.status || 'Pendente';
+                  const fullStatus = getFullStatusName(status); // "Andamento" em vez de "Andam."
+
                   return (
                     <div key={stage.key} className="report-stage-box">
-                      <div className="text-[8px] text-gray-400 uppercase font-bold mb-1">{stage.short}</div>
-                      
-                      <div className={`text-[9px] border rounded px-1 py-0.5 mb-1 font-bold ${getStatusTextClass(status)}`}>
-                        {status}
+                      <div>
+                        <div className="text-[10px] text-gray-500 uppercase font-bold leading-tight">{stage.label}</div>
+                        <div className="text-[9px] text-gray-400 mt-0.5">
+                          {formatDateBR(sData?.date_in)} - {formatDateBR(sData?.date_out)}
+                        </div>
                       </div>
                       
-                      <div className="text-[8px] text-gray-600">
-                        {formatDateBR(sData?.date_in)} - {formatDateBR(sData?.date_out)}
+                      <div className={`text-[10px] border rounded px-2 py-1 font-bold ${getStatusTextClass(status)}`}>
+                        {fullStatus}
                       </div>
                     </div>
                   );
@@ -472,7 +502,7 @@ const Production: React.FC = () => {
         </div>
         
         <div className="mt-8 pt-4 border-t border-gray-300 text-center text-[10px] text-gray-400">
-          Este relatório é gerado automaticamente pelo sistema da Sow Brand.
+          Este documento é um relatório oficial de acompanhamento da Sow Brand.
         </div>
       </div>
 
