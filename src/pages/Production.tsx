@@ -19,11 +19,13 @@ const Production: React.FC = () => {
     fetchData();
   }, []);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  cconst handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     await supabase.from('production_orders').insert([newOrder]);
     setIsModalOpen(false);
-    window.location.reload(); 
+    // Substituido reload() por nova busca de dados para evitar 404
+    const { data: ords } = await supabase.from('production_orders').select('*, clients(name, company_name)').order('created_at', { ascending: false });
+    if (ords) setOrders(ords);
   };
 
   const StatusBadge = ({ status }: { status?: string }) => {

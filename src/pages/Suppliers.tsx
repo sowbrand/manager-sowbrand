@@ -7,30 +7,44 @@ const Suppliers: React.FC = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [activeFilter, setActiveFilter] = useState('Todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newSupplier, setNewSupplier] = useState<Partial<Supplier>>({});
+  const [formData, setFormData] = useState<Partial<Supplier>>({});
 
   const filters = ['Todos', 'Malha', 'Modelagem', 'Corte', 'Costura', 'Bordado', 'Estampa Silk', 'Impressão DTF', 'Prensa DTF', 'Acabamento'];
 
+  const fetchSuppliers = async () => {
+    const { data } = await supabase.from('suppliers').select('*');
+    if (data) setSuppliers(data);
+  };
+
   useEffect(() => {
-    const fetch = async () => {
-      const { data } = await supabase.from('suppliers').select('*');
-      if (data) setSuppliers(data);
-    };
-    fetch();
+    fetchSuppliers();
   }, []);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await supabase.from('suppliers').insert([newSupplier]);
-    setIsModalOpen(false);
-    window.location.reload();
+    const { error } = await supabase.from('suppliers').upsert([formData]);
+    if (!error) {
+      setIsModalOpen(false);
+      fetchSuppliers(); // Atualiza sem reload
+      setFormData({});
+    }
+  };
+
+  const handleEdit = (supplier: Supplier) => {
+    setFormData(supplier);
+    setIsModalOpen(true);
   };
 
   const handleDelete = async (id: string) => {
     if (confirm('Excluir?')) {
       await supabase.from('suppliers').delete().eq('id', id);
-      window.location.reload();
+      fetchSuppliers();
     }
+  };
+
+  const openNew = () => {
+    setFormData({});
+    setIsModalOpen(true);
   };
 
   const filteredSuppliers = activeFilter === 'Todos' 
@@ -40,7 +54,6 @@ const Suppliers: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        {/* Filtros em Tabs */}
         <div className="flex gap-2 overflow-x-auto pb-2 w-full custom-scrollbar">
           {filters.map(filter => (
             <button
@@ -57,7 +70,7 @@ const Suppliers: React.FC = () => {
           ))}
         </div>
         
-        <button onClick={() => setIsModalOpen(true)} className="bg-sow-green text-sow-dark px-4 py-2 rounded-lg font-bold flex items-center gap-2 shrink-0 hover:brightness-95">
+        <button onClick={openNew} className="bg-sow-green text-sow-dark px-4 py-2 rounded-lg font-bold flex items-center gap-2 shrink-0 hover:brightness-95">
           <Plus size={18} /> Novo Fornecedor
         </button>
       </div>
@@ -79,7 +92,7 @@ const Suppliers: React.FC = () => {
             </div>
             
             <div className="flex gap-3 mt-auto">
-              <button className="flex-1 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:bg-gray-50">
+              <button onClick={() => handleEdit(supplier)} className="flex-1 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:bg-gray-50">
                 <Edit2 size={16} /> Editar
               </button>
               <button onClick={() => handleDelete(supplier.id)} className="px-3 py-2 border border-gray-200 text-gray-400 rounded-lg hover:text-red-500 hover:border-red-200 hover:bg-red-50">
@@ -92,14 +105,23 @@ const Suppliers: React.FC = () => {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-           <form onSubmit={handleCreate} className="bg-white p-6 rounded-lg w-full max-w-md space-y-4">
-             <h3 className="font-bold text-lg">Novo Parceiro</h3>
-             <input required placeholder="Nome da Empresa" className="w-full p-2 border rounded" onChange={e => setNewSupplier({...newSupplier, name: e.target.value})} />
-             <select className="w-full p-2 border rounded" onChange={e => setNewSupplier({...newSupplier, category: e.target.value})}>
+           <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg w-full max-w-md space-y-4">
+             <h3 className="font-bold text-lg">{formData.id ? 'Editar' : 'Novo'} Parceiro</h3>
+             <input required placeholder="Nome da Empresa" className="w-full p-2 border rounded" 
+                value={formData.name || ''}
+                onChange={e => setFormData({...formData, name: e.target.value})} />
+             
+             <select className="w-full p-2 border rounded" 
+                value={formData.category || ''}
+                onChange={e => setFormData({...formData, category: e.target.value})}>
                 <option value="">Selecione a Categoria...</option>
                 {filters.slice(1).map(f => <option key={f} value={f}>{f}</option>)}
              </select>
-             <input placeholder="Nome do Responsável / Contato" className="w-full p-2 border rounded" onChange={e => setNewSupplier({...newSupplier, contact_info: e.target.value})} />
+             
+             <input placeholder="Nome do Responsável / Contato" className="w-full p-2 border rounded" 
+                value={formData.contact_info || ''}
+                onChange={e => setFormData({...formData, contact_info: e.target.value})} />
+             
              <div className="flex gap-2">
                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 p-2 border rounded">Cancelar</button>
                <button type="submit" className="flex-1 p-2 bg-sow-green font-bold rounded">Salvar</button>
