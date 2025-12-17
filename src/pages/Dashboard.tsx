@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ShoppingBag, Users, Shirt, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { ShoppingBag, Shirt, AlertCircle, CheckCircle } from 'lucide-react'; // Removido Users e Clock
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { supabase } from '../supabaseClient';
 
@@ -7,20 +7,17 @@ const Dashboard: React.FC = () => {
   const [stats, setStats] = useState({ active: 0, pieces: 0, delivered: 0, late: 0 });
   const [loading, setLoading] = useState(true);
 
-  // Cores dos gráficos
-  const COLORS = ['#fbbf24', '#f87171', '#4ade80']; // Amarelo, Vermelho, Verde
+  const COLORS = ['#fbbf24', '#f87171', '#4ade80'];
 
   useEffect(() => {
     const loadStats = async () => {
       setLoading(true);
-      // Busca ordens
       const { data: orders } = await supabase.from('production_orders').select('*');
       
       if (orders) {
         const active = orders.filter(o => o.status !== 'Entregue').length;
         const pieces = orders.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
         const delivered = orders.filter(o => o.status === 'Entregue').length;
-        // Simulação de atraso (se a data for menor que hoje e não entregue)
         const late = orders.filter(o => o.deadline && new Date(o.deadline) < new Date() && o.status !== 'Entregue').length;
 
         setStats({ active, pieces, delivered, late });
@@ -30,7 +27,6 @@ const Dashboard: React.FC = () => {
     loadStats();
   }, []);
 
-  // Dados Mockados para o gráfico (enquanto não temos histórico suficiente)
   const barData = [
     { name: 'Corte', qtd: 1200 }, { name: 'Costura', qtd: 850 },
     { name: 'Silk', qtd: 400 }, { name: 'DTF', qtd: 300 }, { name: 'Acab.', qtd: 200 },
@@ -59,7 +55,6 @@ const Dashboard: React.FC = () => {
     <div className="space-y-6 p-6 bg-gray-50 min-h-full">
       <h1 className="text-2xl font-bold mb-4 text-sow-black">Dashboard</h1>
       
-      {/* Cards Superiores */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard title="Pedidos Ativos" value={stats.active} icon={ShoppingBag} color="bg-blue-500" />
         <StatCard title="Peças em Produção" value={stats.pieces} icon={Shirt} color="bg-sow-green" />
@@ -67,9 +62,7 @@ const Dashboard: React.FC = () => {
         <StatCard title="Etapas Atrasadas" value={stats.late} icon={AlertCircle} color="bg-red-500" />
       </div>
 
-      {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Gráfico de Barras */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-lg font-bold mb-6">Volume por Etapa (Peças)</h3>
           <div className="h-64">
@@ -86,14 +79,14 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Gráfico de Rosca */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-lg font-bold mb-6">Status Geral da Produção</h3>
           <div className="h-64 flex items-center justify-center">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={pieData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                  {pieData.map((entry, index) => (
+                  {/* Corrigido: Trocamos 'entry' por '_' para o TS ignorar */}
+                  {pieData.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
