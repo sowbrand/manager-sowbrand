@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx';
 // --- Componentes de Edição ---
 
 const EditableStatusCell = ({ status, onUpdate }: { status: string | undefined, onUpdate: (val: string) => void }) => {
+  // Encontra a opção baseada no valor salvo, mas mostra o LABEL completo (ex: "Atrasado")
   const currentStatus = STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0];
   return (
     <select 
@@ -143,7 +144,9 @@ const Production: React.FC = () => {
     let matchesTab = true;
     if (activeTabFilter !== 'Todos') {
       if (!order.stages) matchesTab = false;
-      else matchesTab = Object.values(order.stages).some((stage: any) => stage.status === activeTabFilter);
+      else {
+        matchesTab = Object.values(order.stages).some((stage: any) => stage.status === activeTabFilter);
+      }
     }
 
     const matchesClient = filterClient === 'Todos' || order.client_id === filterClient;
@@ -162,7 +165,9 @@ const Production: React.FC = () => {
       };
       stageColumns.forEach(stage => {
         const sData = order.stages?.[stage.key as keyof typeof order.stages];
-        row[`${stage.label} - Status`] = sData?.status || 'Pendente';
+        // Busca o Label completo para o Excel também
+        const statusLabel = STATUS_OPTIONS.find(s => s.value === sData?.status)?.label || 'Pendente';
+        row[`${stage.label} - Status`] = statusLabel;
         row[`${stage.label} - Forn.`] = sData?.provider || '-';
         row[`${stage.label} - Data`] = sData?.date_out || '-';
       });
@@ -180,7 +185,7 @@ const Production: React.FC = () => {
   // --- Lógica de Impressão ---
   const handlePrint = () => {
     const originalTitle = document.title;
-    let fileName = 'Relatorio_Producao';
+    let fileName = 'Relatorio_Producao_Geral';
 
     if (filterClient !== 'Todos') {
         const clientName = clients.find(c => c.id === filterClient)?.company_name || 'Cliente';
@@ -198,8 +203,6 @@ const Production: React.FC = () => {
     else setExpandedOrderId(id);
   };
 
-  // --- Helpers de Formatação Visual ---
-
   const getStatusColor = (status: string | undefined) => {
     if (status === 'OK') return 'bg-green-500';
     if (status === 'Atras.') return 'bg-red-500';
@@ -207,12 +210,10 @@ const Production: React.FC = () => {
     return 'bg-gray-200';
   };
 
-  // Transforma "Andam." em "Andamento" para o relatório
-  const getFullStatusName = (status: string | undefined) => {
-    if (status === 'Andam.') return 'Andamento';
-    if (status === 'Atras.') return 'Atrasado';
-    if (status === 'OK') return 'Concluído';
-    return status || 'Pendente';
+  // Helper para buscar o texto completo (ex: "Atras." -> "Atrasado")
+  const getFullStatusLabel = (status: string | undefined) => {
+    const option = STATUS_OPTIONS.find(s => s.value === status);
+    return option ? option.label : (status || 'Pendente');
   };
 
   const formatDateBR = (dateStr: string | undefined) => {
@@ -232,69 +233,16 @@ const Production: React.FC = () => {
     <div className="space-y-6">
       <style>{`
         @media print {
-          /* MUDANÇA: Layout Retrato (Portrait) para ficar igual celular */
           @page { size: portrait; margin: 10mm; }
           body { background: white; -webkit-print-color-adjust: exact; }
-          
           .ui-only, nav, header, aside, button, input { display: none !important; }
-          
-          #print-report-container { 
-            display: block !important; 
-            width: 100%; 
-            position: absolute; 
-            top: 0; 
-            left: 0; 
-          }
-          
-          .report-header { 
-            border-bottom: 2px solid #000; 
-            padding-bottom: 15px; 
-            margin-bottom: 25px; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: flex-end; 
-          }
-          
-          /* MUDANÇA: Grid de 1 coluna para ocupar bem a folha vertical */
-          .report-grid { 
-            display: grid; 
-            grid-template-columns: 1fr; /* Um pedido por linha */
-            gap: 20px; 
-          } 
-          
-          .report-card { 
-            border: 1px solid #ccc; 
-            border-radius: 8px; 
-            padding: 15px; 
-            page-break-inside: avoid; /* Não quebra o card no meio */
-            background: #fff; 
-            box-shadow: none;
-          }
-          
-          .report-card-header { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center;
-            margin-bottom: 12px; 
-            padding-bottom: 8px;
-            border-bottom: 1px solid #eee; 
-          }
-          
-          /* MUDANÇA: Grid de Etapas com 2 colunas para caber texto inteiro */
-          .report-stages-grid { 
-            display: grid; 
-            grid-template-columns: repeat(2, 1fr); /* 2 colunas */
-            gap: 10px; 
-          }
-          
-          .report-stage-box { 
-            border: 1px solid #f0f0f0; 
-            padding: 8px 12px; 
-            border-radius: 6px; 
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-          }
+          #print-report-container { display: block !important; width: 100%; position: absolute; top: 0; left: 0; }
+          .report-header { border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end; }
+          .report-grid { display: grid; grid-template-columns: 1fr; gap: 20px; } 
+          .report-card { border: 1px solid #ccc; border-radius: 8px; padding: 15px; page-break-inside: avoid; background: #fff; box-shadow: none; }
+          .report-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
+          .report-stages-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+          .report-stage-box { border: 1px solid #f0f0f0; padding: 8px 12px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
         }
       `}</style>
 
@@ -320,7 +268,6 @@ const Production: React.FC = () => {
             <button onClick={exportToExcel} className="px-3 py-2 border border-green-200 text-green-700 bg-green-50 rounded-lg flex items-center gap-2 hover:bg-green-100 whitespace-nowrap">
               <Download size={16}/> <span className="hidden sm:inline">Excel</span>
             </button>
-            {/* CORREÇÃO ITEM 2: Nome do botão agora é só "PDF" */}
             <button onClick={handlePrint} className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg flex items-center gap-2 hover:bg-gray-50 whitespace-nowrap">
               <Printer size={16}/> <span className="hidden sm:inline">PDF</span>
             </button>
@@ -385,16 +332,14 @@ const Production: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Centro: Bolinhas (CORREÇÃO ITEM 1) */}
+                  {/* Centro: Bolinhas */}
                   <div className="flex-1 flex items-center justify-center gap-6 overflow-x-auto w-full px-4">
                     {stageColumns.map(stage => {
                       const status = order.stages?.[stage.key as keyof typeof order.stages]?.status;
                       return (
                         <div key={stage.key} className="flex flex-col items-center gap-2 min-w-[50px]">
-                          {/* Bolinha Maior (w-4 h-4) */}
-                          <div className={`w-4 h-4 rounded-full ${getStatusColor(status)} shadow-sm`} title={`${stage.label}: ${status || 'Pendente'}`}></div>
-                          {/* Texto Completo */}
-                          <span className="text-[9px] text-gray-500 font-bold uppercase tracking-tight text-center">{stage.label}</span>
+                          <div className={`w-4 h-4 rounded-full ${getStatusColor(status)} shadow-sm`} title={`${stage.label}: ${getFullStatusLabel(status)}`}></div>
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-tight text-center">{stage.label}</span>
                         </div>
                       );
                     })}
@@ -441,7 +386,7 @@ const Production: React.FC = () => {
         </div>
       </div>
 
-      {/* --- ÁREA DE RELATÓRIO PDF (RETRATO / MOBILE FRIENDLY) --- */}
+      {/* --- ÁREA DE RELATÓRIO PDF --- */}
       <div id="print-report-container" className="hidden">
         <div className="report-header">
           <div>
@@ -450,87 +395,4 @@ const Production: React.FC = () => {
             </h1>
             <p className="text-sm text-gray-500 font-bold">{filterClient !== 'Todos' ? clients.find(c => c.id === filterClient)?.company_name : 'Geral'}</p>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-gray-400">Data do Relatório</p>
-            <p className="font-bold text-lg">{new Date().toLocaleDateString()}</p>
-          </div>
-        </div>
-
-        <div className="report-grid">
-          {filteredOrders.map(order => (
-            <div key={order.id} className="report-card">
-              {/* Header do Card (Cliente + Info) */}
-              <div className="report-card-header">
-                <div>
-                  <div className="text-xs text-gray-400 font-bold uppercase mb-1">{order.clients?.company_name}</div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold bg-black text-white px-2 py-0.5 rounded">{order.order_number}</span>
-                    <span className="text-base font-bold text-gray-800">{order.product_name}</span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs text-gray-500 block">Quantidade</span>
-                  <span className="font-bold text-xl">{order.quantity}</span>
-                </div>
-              </div>
-
-              {/* Lista de Etapas (2 Colunas para caber textos inteiros) */}
-              <div className="report-stages-grid">
-                {stageColumns.map(stage => {
-                  const sData = order.stages?.[stage.key as keyof typeof order.stages];
-                  const status = sData?.status || 'Pendente';
-                  const fullStatus = getFullStatusName(status); // "Andamento" em vez de "Andam."
-
-                  return (
-                    <div key={stage.key} className="report-stage-box">
-                      <div>
-                        <div className="text-[10px] text-gray-500 uppercase font-bold leading-tight">{stage.label}</div>
-                        <div className="text-[9px] text-gray-400 mt-0.5">
-                          {formatDateBR(sData?.date_in)} - {formatDateBR(sData?.date_out)}
-                        </div>
-                      </div>
-                      
-                      <div className={`text-[10px] border rounded px-2 py-1 font-bold ${getStatusTextClass(status)}`}>
-                        {fullStatus}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        <div className="mt-8 pt-4 border-t border-gray-300 text-center text-[10px] text-gray-400">
-          Este documento é um relatório oficial de acompanhamento da Sow Brand.
-        </div>
-      </div>
-
-      {/* Modal Novo Pedido */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 ui-only">
-          <form onSubmit={handleCreate} className="bg-white p-6 rounded-lg w-full max-w-md space-y-4 shadow-xl">
-             <h3 className="font-bold text-lg">Novo Pedido</h3>
-             <div className="grid grid-cols-2 gap-4">
-                <div><label className="text-xs font-bold text-gray-500">ID Pedido *</label><input required placeholder="Ex: PROP-1020" className="w-full p-2 border rounded mt-1" value={newOrder.order_number} onChange={e => setNewOrder({...newOrder, order_number: e.target.value})} /></div>
-                <div><label className="text-xs font-bold text-gray-500">Qtd *</label><input required type="number" className="w-full p-2 border rounded mt-1" value={newOrder.quantity || ''} onChange={e => setNewOrder({...newOrder, quantity: Number(e.target.value)})} /></div>
-             </div>
-             <div><label className="text-xs font-bold text-gray-500">Cliente *</label>
-                <select required className="w-full p-2 border rounded mt-1" onChange={e => setNewOrder({...newOrder, client_id: e.target.value})}>
-                    <option value="">Selecione...</option>
-                    {clients.map(c => <option key={c.id} value={c.id}>{c.company_name || c.name}</option>)}
-                </select>
-             </div>
-             <div><label className="text-xs font-bold text-gray-500">Produto</label><input className="w-full p-2 border rounded mt-1" onChange={e => setNewOrder({...newOrder, product_name: e.target.value})} /></div>
-             <div className="flex gap-2 pt-4">
-               <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 p-2 border rounded font-bold">Cancelar</button>
-               <button type="submit" className="flex-1 p-2 bg-sow-green font-bold rounded text-sow-dark hover:brightness-95">Salvar</button>
-             </div>
-          </form>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default Production;
+          <div className="text-right"></div>
