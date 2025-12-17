@@ -10,10 +10,10 @@ const Suppliers: React.FC = () => {
   
   // Modais
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false); // Novo modal de Ver Mais
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   
   const [formData, setFormData] = useState<Partial<Supplier>>({});
-  const [viewData, setViewData] = useState<Supplier | null>(null); // Dados para visualização
+  const [viewData, setViewData] = useState<Supplier | null>(null);
   const [loading, setLoading] = useState(false);
 
   const filters = ['Todos', ...Object.keys(SUPPLIER_CONFIG)];
@@ -52,14 +52,12 @@ const Suppliers: React.FC = () => {
     }
   };
 
-  // Abre modal de edição (direto ou vindo do Ver Mais)
   const openEdit = (supplier: Partial<Supplier>) => {
     setFormData(supplier);
-    setIsViewModalOpen(false); // Fecha o ver mais se estiver aberto
+    setIsViewModalOpen(false);
     setIsEditModalOpen(true);
   };
 
-  // Abre modal de Ver Mais
   const openView = (supplier: Supplier) => {
     setViewData(supplier);
     setIsViewModalOpen(true);
@@ -110,16 +108,20 @@ const Suppliers: React.FC = () => {
                     </span>
                   </div>
                   <div className="text-[10px] text-gray-500 flex flex-col leading-tight">
-                    <span className="truncate">{supplier.contact_info}</span>
-                    <span className="truncate text-gray-400">{supplier.phone || '-'}</span>
+                    <span className="truncate font-medium">{supplier.contact_info}</span>
+                    {/* USO DO ÍCONE PHONE AQUI */}
+                    <span className="truncate text-gray-400 flex items-center gap-1 mt-0.5">
+                        <Phone size={10} /> {supplier.phone || '-'}
+                    </span>
                   </div>
                 </div>
               </div>
 
               {/* Direita: Ações */}
               <div className="flex flex-col gap-1.5 shrink-0">
-                <button onClick={() => openView(supplier)} className="px-3 py-1 border border-gray-200 text-gray-500 rounded text-[10px] font-bold hover:bg-gray-50 hover:text-gray-700 transition-colors">
-                  Ver Mais
+                {/* USO DO ÍCONE EYE AQUI */}
+                <button onClick={() => openView(supplier)} className="px-3 py-1 border border-gray-200 text-gray-500 rounded text-[10px] font-bold hover:bg-gray-50 hover:text-gray-700 transition-colors flex items-center justify-center gap-1">
+                  <Eye size={10} /> Ver Mais
                 </button>
                 <button onClick={() => openEdit(supplier)} className="px-3 py-1 bg-gray-50 text-gray-600 rounded text-[10px] font-bold hover:bg-sow-green hover:text-sow-dark transition-colors flex items-center justify-center gap-1">
                   <Edit2 size={10} /> Editar
@@ -146,10 +148,26 @@ const Suppliers: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-y-4 gap-x-8 text-sm mb-6">
                <div><p className="text-xs text-gray-400 font-bold uppercase">Contato</p><p>{viewData.contact_info}</p></div>
-               <div><p className="text-xs text-gray-400 font-bold uppercase">Telefone</p><p>{viewData.phone || '-'}</p></div>
-               <div><p className="text-xs text-gray-400 font-bold uppercase">Email</p><p>{viewData.email || '-'}</p></div>
+               
+               {/* USO DO ÍCONE PHONE NO MODAL */}
+               <div>
+                   <p className="text-xs text-gray-400 font-bold uppercase flex items-center gap-1"><Phone size={12}/> Telefone</p>
+                   <p>{viewData.phone || '-'}</p>
+               </div>
+               
+               {/* USO DO ÍCONE MAIL NO MODAL */}
+               <div>
+                   <p className="text-xs text-gray-400 font-bold uppercase flex items-center gap-1"><Mail size={12}/> Email</p>
+                   <p>{viewData.email || '-'}</p>
+               </div>
+               
                <div><p className="text-xs text-gray-400 font-bold uppercase">CNPJ</p><p>{viewData.cnpj || '-'}</p></div>
-               <div className="col-span-2"><p className="text-xs text-gray-400 font-bold uppercase">Endereço</p><p>{viewData.address || '-'}</p></div>
+               
+               {/* USO DO ÍCONE MAPPIN NO MODAL */}
+               <div className="col-span-2">
+                   <p className="text-xs text-gray-400 font-bold uppercase flex items-center gap-1"><MapPin size={12}/> Endereço</p>
+                   <p>{viewData.address || '-'}</p>
+               </div>
                
                {viewData.observations && (
                  <div className="col-span-2 bg-yellow-50 p-3 rounded border border-yellow-100 text-yellow-800 text-xs mt-2">
