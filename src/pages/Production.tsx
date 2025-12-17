@@ -4,8 +4,6 @@ import { supabase } from '../supabaseClient';
 import type { ProductionOrder, Client, Supplier } from '../types';
 import { STATUS_OPTIONS } from '../constants';
 
-// --- Componentes de Célula Editável ---
-
 const EditableStatusCell = ({ status, onUpdate }: { status: string | undefined, onUpdate: (val: string) => void }) => {
   const currentStatus = STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0];
   return (
@@ -32,7 +30,6 @@ const EditableDateCell = ({ date, onUpdate }: { date: string | undefined, onUpda
   />
 );
 
-// CORREÇÃO AQUI: Tipagem flexível para aceitar tanto fornecedores quanto opções manuais
 const EditableSupplierCell = ({ 
   current, category, stageKey, suppliers, onUpdate 
 }: { 
@@ -43,16 +40,17 @@ const EditableSupplierCell = ({
   onUpdate: (val: string) => void 
 }) => {
   
-  // 1. Transformamos os fornecedores do banco em objetos simples { id, name }
-  // Isso evita o erro de TypeScript pois agora a lista não exige campos como CNPJ/Telefone
+  // Lista padrão: fornecedores da categoria
   let options: { id: string, name: string }[] = suppliers
     .filter(s => s.category === category)
     .map(s => ({ id: s.id, name: s.name }));
 
-  // 2. Adicionamos as opções manuais conforme a regra da etapa
+  // REGRAS DE NEGÓCIO (CORREÇÃO ITEM 2)
   if (stageKey === 'modeling') {
-    options = [{ id: 'interno', name: 'Interno' }, { id: 'cliente', name: 'Cliente' }, ...options];
+    // Modelagem: APENAS Interno ou Cliente (sem lista de nomes)
+    options = [{ id: 'interno', name: 'Interno' }, { id: 'cliente', name: 'Cliente' }];
   } else if (stageKey === 'dtf_press') {
+    // DTF Press: Interno + Fornecedores
     options = [{ id: 'interno', name: 'Interno' }, ...options];
   }
 
@@ -71,14 +69,13 @@ const EditableSupplierCell = ({
   );
 };
 
-// --- Componente Principal ---
-
 const Production: React.FC = () => {
   const [orders, setOrders] = useState<ProductionOrder[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newOrder, setNewOrder] = useState({ order_number: '', client_id: '', product_name: '', quantity: 0, origin_model: 'Interno' });
+  // Removido origin_model do estado inicial
+  const [newOrder, setNewOrder] = useState({ order_number: '', client_id: '', product_name: '', quantity: 0 });
 
   const fetchData = useCallback(async () => {
     const { data: ords } = await supabase.from('production_orders').select('*, clients(name, company_name)').order('created_at', { ascending: false });
@@ -114,7 +111,7 @@ const Production: React.FC = () => {
     e.preventDefault();
     if (!newOrder.order_number) return alert('ID obrigatório');
     const { error } = await supabase.from('production_orders').insert([newOrder]);
-    if (!error) { setIsModalOpen(false); fetchData(); setNewOrder({ ...newOrder, order_number: '', quantity: 0 }); }
+    if (!error) { setIsModalOpen(false); fetchData(); setNewOrder({ order_number: '', client_id: '', product_name: '', quantity: 0 }); }
   };
 
   const stageColumns = [
@@ -146,10 +143,11 @@ const Production: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50 text-xs font-bold text-gray-500 uppercase leading-normal">
+                {/* CORREÇÃO ITEM 1: Removida a coluna Origem Mod. */}
                 <th className="p-3 min-w-[180px] border-b border-r z-10 sticky left-0 bg-gray-50" rowSpan={2}>Pedido / Cliente</th>
                 <th className="p-3 min-w-[140px] border-b border-r" rowSpan={2}>Produto</th>
                 <th className="p-3 text-center border-b border-r" rowSpan={2}>Qtd</th>
-                <th className="p-3 text-center border-b border-r min-w-[100px]" rowSpan={2}>Origem Mod.</th>
+                
                 {stageColumns.map(stage => (
                   <th key={stage.key} className="p-2 border-b border-r text-center min-w-[360px]" colSpan={4}>{stage.label}</th>
                 ))}
@@ -174,12 +172,8 @@ const Production: React.FC = () => {
                   </td>
                   <td className="p-3 border-r text-gray-700 font-medium truncate max-w-[140px]" title={order.product_name}>{order.product_name}</td>
                   <td className="p-3 border-r text-center font-bold">{order.quantity}</td>
-                  <td className="p-3 border-r text-center">
-                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${order.origin_model === 'Interno' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
-                      {order.origin_model}
-                    </span>
-                  </td>
-
+                  
+                  {/* Etapas */}
                   {stageColumns.map(stage => {
                     const stageData = order.stages?.[stage.key as keyof typeof order.stages];
                     return (
@@ -239,12 +233,6 @@ const Production: React.FC = () => {
                 </select>
              </div>
              <div><label className="text-xs font-bold text-gray-500">Produto</label><input className="w-full p-2 border rounded mt-1" onChange={e => setNewOrder({...newOrder, product_name: e.target.value})} /></div>
-             <div><label className="text-xs font-bold text-gray-500">Origem Modelagem</label>
-                <select className="w-full p-2 border rounded mt-1" value={newOrder.origin_model} onChange={e => setNewOrder({...newOrder, origin_model: e.target.value})}>
-                    <option value="Interno">Interno (Sow)</option>
-                    <option value="Cliente">Cliente</option>
-                </select>
-             </div>
              <div className="flex gap-2 pt-4">
                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 p-2 border rounded font-bold">Cancelar</button>
                <button type="submit" className="flex-1 p-2 bg-sow-green font-bold rounded text-sow-dark hover:brightness-95">Salvar</button>

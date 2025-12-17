@@ -23,8 +23,19 @@ const Dashboard: React.FC = () => {
         const active = orders.filter(o => o.status !== 'Entregue').length;
         const pieces = orders.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
         const delivered = orders.filter(o => o.status === 'Entregue').length;
-        const late = orders.filter(o => o.deadline && new Date(o.deadline) < new Date() && o.status !== 'Entregue').length;
-        setStats({ active, pieces, delivered, late });
+        
+        // CORREÇÃO ITEM 3: Cálculo real de atraso baseado no status das etapas
+        let lateOrdersCount = 0;
+        
+        orders.forEach(order => {
+          if (order.stages) {
+            // Verifica se ALGUMA etapa está marcada como 'Atras.'
+            const hasLateStage = Object.values(order.stages).some((stage: any) => stage.status === 'Atras.');
+            if (hasLateStage) lateOrdersCount++;
+          }
+        });
+
+        setStats({ active, pieces, delivered, late: lateOrdersCount });
 
         const calcStage = (stageName: string) => {
           return orders.reduce((acc, order) => {
@@ -51,8 +62,9 @@ const Dashboard: React.FC = () => {
     loadStats();
   }, []);
   
+  // Dados do gráfico de pizza agora refletem os atrasos reais
   const pieData = [
-    { name: 'Atenção', value: stats.active },
+    { name: 'Atenção', value: Math.max(0, stats.active - stats.late) }, // Ativos que não estão atrasados
     { name: 'Atrasado', value: stats.late }, 
     { name: 'Em dia', value: stats.delivered },
   ];
