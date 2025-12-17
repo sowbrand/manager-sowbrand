@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, MapPin, Phone, Mail, FileText, Factory } from 'lucide-react';
+import { Plus, Trash2, Edit2, MapPin, Phone, Mail, FileText } from 'lucide-react'; // REMOVIDO: Factory
 import { supabase } from '../supabaseClient';
 import type { Supplier } from '../types';
-import { SUPPLIER_CONFIG } from '../constants'; // Importando as configurações
+import { SUPPLIER_CONFIG } from '../constants';
 
 const Suppliers: React.FC = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -51,7 +51,6 @@ const Suppliers: React.FC = () => {
     ? suppliers 
     : suppliers.filter(s => s.category === activeFilter);
 
-  // Componente para renderizar o ícone e a cor correta (Item 5)
   const CategoryBadge = ({ category }: { category: string }) => {
     const config = SUPPLIER_CONFIG[category] || SUPPLIER_CONFIG['Outros'];
     const Icon = config.icon;
@@ -69,7 +68,6 @@ const Suppliers: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Filtros e Botão Novo */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex gap-2 overflow-x-auto pb-2 w-full custom-scrollbar">
           {filters.map(filter => (
@@ -86,12 +84,10 @@ const Suppliers: React.FC = () => {
         </button>
       </div>
 
-      {/* Grid de Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredSuppliers.map(supplier => (
           <div key={supplier.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 flex flex-col justify-between h-full hover:shadow-md transition-shadow">
             <div>
-              {/* Badge com Ícone e Cor Pastel (Item 5) */}
               <CategoryBadge category={supplier.category} />
               
               <h3 className="text-lg font-bold text-gray-900 mb-1">{supplier.name}</h3>
@@ -119,7 +115,6 @@ const Suppliers: React.FC = () => {
         ))}
       </div>
 
-      {/* Modal de Cadastro/Edição (Mantido igual) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
            <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg w-full max-w-2xl space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
