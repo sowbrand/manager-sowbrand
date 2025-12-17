@@ -4,9 +4,8 @@ import { supabase } from '../supabaseClient';
 import type { ProductionOrder, Client, Supplier } from '../types';
 import { STATUS_OPTIONS } from '../constants';
 
-// --- Componentes de Célula Editável (Item 1 e 4) ---
+// --- Componentes de Célula Editável ---
 
-// Célula de Status (Dropdown com cores)
 const EditableStatusCell = ({ status, onUpdate }: { status: string | undefined, onUpdate: (val: string) => void }) => {
   const currentStatus = STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0];
   return (
@@ -24,37 +23,45 @@ const EditableStatusCell = ({ status, onUpdate }: { status: string | undefined, 
   );
 };
 
-// Célula de Data (Input type="date")
 const EditableDateCell = ({ date, onUpdate }: { date: string | undefined, onUpdate: (val: string) => void }) => (
   <input 
     type="date" 
     value={date || ''} 
     onChange={(e) => onUpdate(e.target.value)}
-    className="w-full p-1 text-xs border border-gray-200 rounded text-center text-gray-600 focus:border-sow-green focus:outline-none"
+    className="w-full p-1 text-[10px] border border-gray-200 rounded text-center text-gray-600 focus:border-sow-green focus:outline-none"
   />
 );
 
-// Célula de Fornecedor (Dropdown dinâmico)
+// CORREÇÃO 1: Lógica de opções refinada por etapa
 const EditableSupplierCell = ({ 
-  current, category, suppliers, onUpdate 
+  current, category, stageKey, suppliers, onUpdate 
 }: { 
   current: string | undefined, 
   category: string, 
+  stageKey: string,
   suppliers: Supplier[], 
   onUpdate: (val: string) => void 
 }) => {
-  // Filtra fornecedores da categoria correta + opções padrão
-  const options = [
-    { id: 'interno', name: 'Interno' },
-    { id: 'cliente', name: 'Cliente' },
-    ...suppliers.filter(s => s.category === category)
-  ];
+  
+  let options = [...suppliers.filter(s => s.category === category)];
+
+  // Regras Específicas (Item 1)
+  if (stageKey === 'modeling') {
+    // Modelagem aceita tudo
+    options = [{ id: 'interno', name: 'Interno' }, { id: 'cliente', name: 'Cliente' }, ...options];
+  } else if (stageKey === 'dtf_press') {
+    // DTF Press aceita Interno + Fornecedores
+    options = [{ id: 'interno', name: 'Interno' }, ...options];
+  }
+  // Demais etapas (Costura, Corte, etc) só mostram fornecedores cadastrados
 
   return (
     <select 
       value={current || ''} 
       onChange={(e) => onUpdate(e.target.value)}
-      className="w-full p-1 text-xs border border-gray-200 rounded text-gray-700 truncate cursor-pointer focus:border-sow-green focus:outline-none bg-white"
+      // CORREÇÃO 2: Removido 'truncate' para tentar mostrar tudo, ajustado font-size
+      className="w-full p-1 text-[11px] border border-gray-200 rounded text-gray-700 cursor-pointer focus:border-sow-green focus:outline-none bg-white"
+      title={current} // Tooltip nativo para nomes muito longos
     >
       <option value="">-</option>
       {options.map(opt => (
@@ -64,7 +71,7 @@ const EditableSupplierCell = ({
   );
 };
 
-// --- Componente Principal da Página ---
+// --- Componente Principal ---
 
 const Production: React.FC = () => {
   const [orders, setOrders] = useState<ProductionOrder[]>([]);
@@ -84,40 +91,23 @@ const Production: React.FC = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Função Central para Atualizar o Banco de Dados (Crucial para Item 1)
   const updateOrderStage = async (orderId: string, stageName: string, field: string, value: string) => {
-    // 1. Encontra o pedido e o estágio atual no estado local
     const orderIndex = orders.findIndex(o => o.id === orderId);
     if (orderIndex === -1) return;
     
     const currentStages = orders[orderIndex].stages || {};
     const currentStageData = currentStages[stageName as keyof typeof currentStages] || { status: 'Pendente' };
 
-    // 2. Cria o novo objeto de estágios atualizado
     const updatedStages = {
       ...currentStages,
-      [stageName]: {
-        ...currentStageData,
-        [field]: value
-      }
+      [stageName]: { ...currentStageData, [field]: value }
     };
 
-    // 3. Atualiza o estado local imediatamente (para UI responsiva)
     const updatedOrders = [...orders];
     updatedOrders[orderIndex] = { ...updatedOrders[orderIndex], stages: updatedStages };
     setOrders(updatedOrders);
 
-    // 4. Envia a atualização para o Supabase (campo JSONB 'stages')
-    const { error } = await supabase
-      .from('production_orders')
-      .update({ stages: updatedStages })
-      .eq('id', orderId);
-
-    if (error) {
-      console.error('Erro ao atualizar estágio:', error);
-      alert('Erro ao salvar alteração. Verifique sua conexão.');
-      fetchData(); // Reverte mudanças locais em caso de erro
-    }
+    await supabase.from('production_orders').update({ stages: updatedStages }).eq('id', orderId);
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -127,7 +117,6 @@ const Production: React.FC = () => {
     if (!error) { setIsModalOpen(false); fetchData(); setNewOrder({ ...newOrder, order_number: '', quantity: 0 }); }
   };
 
-  // Definição das colunas e suas categorias correspondentes (Item 3 - Sequência Correta)
   const stageColumns = [
     { key: 'modeling', label: 'Modelagem', category: 'Modelagem' },
     { key: 'cut', label: 'Corte', category: 'Corte' },
@@ -141,7 +130,6 @@ const Production: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header e Filtros (Mantido igual) */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -153,28 +141,25 @@ const Production: React.FC = () => {
         </div>
       </div>
 
-      {/* Data Grid Editável */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-        <div className="overflow-x-auto custom-scrollbar pb-24"> {/* Padding bottom extra para dropdowns */}
+        <div className="overflow-x-auto custom-scrollbar pb-32">
           <table className="w-full text-left border-collapse">
             <thead>
-              {/* Cabeçalho Principal (Item 2 e 3 - Estrutura Corrigida) */}
               <tr className="bg-gray-50 text-xs font-bold text-gray-500 uppercase leading-normal">
                 <th className="p-3 min-w-[180px] border-b border-r z-10 sticky left-0 bg-gray-50" rowSpan={2}>Pedido / Cliente</th>
                 <th className="p-3 min-w-[140px] border-b border-r" rowSpan={2}>Produto</th>
                 <th className="p-3 text-center border-b border-r" rowSpan={2}>Qtd</th>
-                {/* Item 2: "Origem Mod." na posição correta */}
                 <th className="p-3 text-center border-b border-r min-w-[100px]" rowSpan={2}>Origem Mod.</th>
-                {/* Colunas de Estágios (Item 3 - Sequência) */}
                 {stageColumns.map(stage => (
-                  <th key={stage.key} className="p-2 border-b border-r text-center min-w-[320px]" colSpan={4}>{stage.label}</th>
+                  // CORREÇÃO 2: Aumentei min-w para 360px para caber nomes longos
+                  <th key={stage.key} className="p-2 border-b border-r text-center min-w-[360px]" colSpan={4}>{stage.label}</th>
                 ))}
               </tr>
-              {/* Sub-cabeçalho */}
               <tr className="bg-gray-50 text-[10px] font-bold text-gray-500 uppercase leading-normal">
                 {stageColumns.map((_, i) => (
                   <React.Fragment key={i}>
-                    <th className="p-2 border-b border-r text-center w-[110px]">Fornecedor</th>
+                    {/* CORREÇÃO 2: Coluna Fornecedor agora tem 150px (antes 110px) */}
+                    <th className="p-2 border-b border-r text-center w-[150px]">Fornecedor</th>
                     <th className="p-2 border-b border-r text-center w-[85px]">Ent.</th>
                     <th className="p-2 border-b border-r text-center w-[85px]">Sai.</th>
                     <th className="p-2 border-b border-r text-center w-[80px]">Status</th>
@@ -185,21 +170,18 @@ const Production: React.FC = () => {
             <tbody className="divide-y divide-gray-100 text-sm">
               {orders.map((order) => (
                 <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                  {/* Colunas Fixas */}
                   <td className="p-3 border-r sticky left-0 bg-white z-10 group-hover:bg-gray-50">
                     <div className="font-bold text-sow-dark">{order.order_number}</div>
                     <div className="text-xs text-gray-500 truncate">{order.clients?.company_name || order.clients?.name}</div>
                   </td>
                   <td className="p-3 border-r text-gray-700 font-medium truncate max-w-[140px]" title={order.product_name}>{order.product_name}</td>
                   <td className="p-3 border-r text-center font-bold">{order.quantity}</td>
-                  {/* Item 2: Badge de Origem Mod. (Interno/Cliente) */}
                   <td className="p-3 border-r text-center">
                     <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${order.origin_model === 'Interno' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
                       {order.origin_model}
                     </span>
                   </td>
 
-                  {/* Células Editáveis dos Estágios (Item 1) */}
                   {stageColumns.map(stage => {
                     const stageData = order.stages?.[stage.key as keyof typeof order.stages];
                     return (
@@ -208,6 +190,7 @@ const Production: React.FC = () => {
                           <EditableSupplierCell 
                             current={stageData?.provider} 
                             category={stage.category}
+                            stageKey={stage.key} // Passamos a chave para saber qual regra aplicar
                             suppliers={suppliers}
                             onUpdate={(val) => updateOrderStage(order.id, stage.key, 'provider', val)}
                           />
@@ -225,7 +208,6 @@ const Production: React.FC = () => {
                           />
                         </td>
                         <td className="p-2 border-r text-center">
-                           {/* Item 4: Dropdown de Status Colorido */}
                           <EditableStatusCell 
                             status={stageData?.status}
                             onUpdate={(val) => updateOrderStage(order.id, stage.key, 'status', val)}
@@ -244,7 +226,6 @@ const Production: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal Novo Pedido (Atualizado para Origem Interno/Cliente) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <form onSubmit={handleCreate} className="bg-white p-6 rounded-lg w-full max-w-md space-y-4 shadow-xl">
@@ -260,7 +241,6 @@ const Production: React.FC = () => {
                 </select>
              </div>
              <div><label className="text-xs font-bold text-gray-500">Produto</label><input className="w-full p-2 border rounded mt-1" onChange={e => setNewOrder({...newOrder, product_name: e.target.value})} /></div>
-             {/* Item 2: Correção no seletor de Origem */}
              <div><label className="text-xs font-bold text-gray-500">Origem Modelagem</label>
                 <select className="w-full p-2 border rounded mt-1" value={newOrder.origin_model} onChange={e => setNewOrder({...newOrder, origin_model: e.target.value})}>
                     <option value="Interno">Interno (Sow)</option>
