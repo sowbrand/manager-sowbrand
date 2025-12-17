@@ -1,11 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Filter, Download, Printer, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Clock, X } from 'lucide-react'; // REMOVIDO: Droplet
+import { Plus, Search, Filter, Download, Printer, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Clock, X, Cloud, Loader2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import type { ProductionOrder, Client, Supplier } from '../types';
 import { STATUS_OPTIONS } from '../constants';
 import * as XLSX from 'xlsx';
+import { gapi } from 'gapi-script';
 
-// --- Componentes de Edição ---
+// --- CONFIGURAÇÃO DO GOOGLE DRIVE ---
+// ⚠️ COLE SUAS CHAVES AQUI DENTRO DAS ASPAS:
+const CLIENT_ID = "839855666704-3mb0lgpmrk2mi4a812d6q2p7rtukem9f.apps.googleusercontent.com"; 
+const API_KEY = "CAIzaSyCljCB6lkuZCA-1eNRtwie9k5KwQ8X5IB0"; 
+const SPREADSHEET_ID = "1c1nK9T3KK0wGI8sb8uJx_lJ2junAs1U_R-Xyz1KovP4ANILHA_AQUI"; 
+
+// Não mexer aqui (Configurações internas do Google)
+const SCOPES = "https://www.googleapis.com/auth/spreadsheets"; 
+const DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
+
+// --- COMPONENTES DE CÉLULA EDITÁVEL ---
 
 const EditableStatusCell = ({ status, onUpdate }: { status: string | undefined, onUpdate: (val: string) => void }) => {
   const currentStatus = STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0];
@@ -67,7 +78,7 @@ const EditableSupplierCell = ({
   );
 };
 
-// --- Componente Principal ---
+// --- COMPONENTE PRINCIPAL ---
 
 const Production: React.FC = () => {
   const [orders, setOrders] = useState<ProductionOrder[]>([]);
@@ -83,9 +94,12 @@ const Production: React.FC = () => {
   const [filterClient, setFilterClient] = useState('Todos'); 
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Estados de Sincronização Google
+  const [isGapiInitialized, setIsGapiInitialized] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
   const [newOrder, setNewOrder] = useState({ order_number: '', client_id: '', product_name: '', quantity: 0 });
 
-  // Definição das Colunas (INCLUINDO TINTURARIA)
   const stageColumns = [
     { key: 'modeling', label: 'Modelagem', category: 'Modelagem' },
     { key: 'cut', label: 'Corte', category: 'Corte' },
@@ -108,6 +122,23 @@ const Production: React.FC = () => {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Inicializar Google API
+  useEffect(() => {
+    const start = () => {
+      gapi.client.init({
+        apiKey: API_KEY,
+        clientId: CLIENT_ID,
+        discoveryDocs: DISCOVERY_DOCS,
+        scope: SCOPES,
+      }).then(() => {
+        setIsGapiInitialized(true);
+      }).catch((error: any) => {
+        console.error("Erro ao inicializar Google API:", error);
+      });
+    };
+    gapi.load('client:auth2', start);
+  }, []);
 
   const updateOrderStage = async (orderId: string, stageName: string, field: string, value: string) => {
     const orderIndex = orders.findIndex(o => o.id === orderId);
@@ -135,7 +166,6 @@ const Production: React.FC = () => {
     if (!error) { setIsModalOpen(false); fetchData(); setNewOrder({ order_number: '', client_id: '', product_name: '', quantity: 0 }); }
   };
 
-  // --- Lógica de Filtragem ---
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
       order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -155,7 +185,69 @@ const Production: React.FC = () => {
     return matchesSearch && matchesTab && matchesClient;
   });
 
-  // --- Exportação Excel ---
+  // --- SINCRONIZAÇÃO GOOGLE DRIVE ---
+  const handleSyncDrive = async () => {
+    if (!isGapiInitialized) return alert('Sistema do Google ainda carregando... Tente em instantes.');
+    
+    setIsSyncing(true);
+
+    try {
+      // 1. Verifica Login
+      const authInstance = gapi.auth2.getAuthInstance();
+      if (!authInstance.isSignedIn.get()) {
+        await authInstance.signIn();
+      }
+
+      // 2. Prepara os Dados
+      const headers = [
+        'Pedido', 'Cliente', 'Produto', 'Qtd',
+        ...stageColumns.flatMap(s => [`${s.label} - Status`, `${s.label} - Data`]) // Simplificado para Backup
+      ];
+
+      const rows = filteredOrders.map(order => {
+        const base = [
+          order.order_number,
+          order.clients?.company_name || 'N/A',
+          order.product_name,
+          order.quantity
+        ];
+        
+        const stages = stageColumns.flatMap(stage => {
+          const sData = order.stages?.[stage.key as keyof typeof order.stages];
+          const label = getFullStatusLabel(sData?.status);
+          const date = sData?.date_out ? formatDateBR(sData?.date_out) : '-';
+          return [label, date];
+        });
+
+        return [...base, ...stages];
+      });
+
+      const values = [headers, ...rows];
+
+      // 3. Limpa a Planilha (Range A1:Z1000)
+      await gapi.client.sheets.spreadsheets.values.clear({
+        spreadsheetId: SPREADSHEET_ID,
+        range: 'Página1!A1:Z1000',
+      });
+
+      // 4. Escreve os Novos Dados
+      await gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: 'Página1!A1',
+        valueInputOption: 'USER_ENTERED',
+        resource: { values },
+      });
+
+      alert('✅ Backup Realizado com Sucesso no Google Drive!');
+
+    } catch (error: any) {
+      console.error('Erro no Sync:', error);
+      alert('Erro ao sincronizar: ' + (error.result?.error?.message || error.message));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const exportToExcel = () => {
     const dataToExport = filteredOrders.map(order => {
       const row: any = {
@@ -166,8 +258,7 @@ const Production: React.FC = () => {
       };
       stageColumns.forEach(stage => {
         const sData = order.stages?.[stage.key as keyof typeof order.stages];
-        const labelStatus = STATUS_OPTIONS.find(s => s.value === sData?.status)?.label || 'Pendente';
-        row[`${stage.label} - Status`] = labelStatus;
+        row[`${stage.label} - Status`] = getFullStatusLabel(sData?.status);
         row[`${stage.label} - Forn.`] = sData?.provider || '-';
         row[`${stage.label} - Data`] = sData?.date_out || '-';
       });
@@ -182,7 +273,6 @@ const Production: React.FC = () => {
     XLSX.writeFile(workbook, "Relatorio_Producao_SowBrand.xlsx");
   };
 
-  // --- Impressão PDF ---
   const handlePrint = () => {
     const originalTitle = document.title;
     let fileName = 'Relatorio_Producao_Geral';
@@ -249,7 +339,6 @@ const Production: React.FC = () => {
 
       {/* --- ÁREA DE TRABALHO (UI GESTOR) --- */}
       <div className="ui-only">
-        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
           <div className="relative w-full md:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -264,6 +353,16 @@ const Production: React.FC = () => {
           <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
             <button onClick={() => setShowFilters(!showFilters)} className={`px-3 py-2 border rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap ${showFilters ? 'bg-gray-100' : 'hover:bg-gray-50'}`}>
               <Filter size={16}/> <span className="hidden sm:inline">Filtros</span>
+            </button>
+
+            {/* BOTÃO SYNC DRIVE */}
+            <button 
+              onClick={handleSyncDrive} 
+              disabled={isSyncing || !isGapiInitialized}
+              className={`px-3 py-2 border border-blue-200 text-blue-700 bg-blue-50 rounded-lg flex items-center gap-2 hover:bg-blue-100 whitespace-nowrap ${isSyncing ? 'opacity-70 cursor-wait' : ''}`}
+            >
+              {isSyncing ? <Loader2 size={16} className="animate-spin"/> : <Cloud size={16}/>} 
+              <span className="hidden sm:inline">{isSyncing ? 'Enviando...' : 'Drive Backup'}</span>
             </button>
 
             <button onClick={exportToExcel} className="px-3 py-2 border border-green-200 text-green-700 bg-green-50 rounded-lg flex items-center gap-2 hover:bg-green-100 whitespace-nowrap">
@@ -335,7 +434,6 @@ const Production: React.FC = () => {
                   <div className="flex-1 flex items-center justify-center gap-6 overflow-x-auto w-full px-4">
                     {stageColumns.map(stage => {
                       const status = order.stages?.[stage.key as keyof typeof order.stages]?.status;
-                      // Esconde bolinha se for N/A na visão resumida
                       if (status === 'N/A') return null;
                       
                       return (
@@ -425,7 +523,6 @@ const Production: React.FC = () => {
                   const status = sData?.status || 'Pendente';
                   const fullStatus = getFullStatusLabel(status);
 
-                  // SE FOR N/A, REMOVE DO RELATÓRIO
                   if (status === 'N/A') return null;
 
                   return (
