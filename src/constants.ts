@@ -1,12 +1,33 @@
-// Configuração padrão completa para evitar erros de tipo
+import { 
+  Shirt, Scissors, PenTool, Palette, Printer, Package,
+  Factory, Stamp, Layers
+} from 'lucide-react';
+
 export const DEFAULT_COMPANY_SETTINGS = {
   company_name: 'Sow Brand',
-  cnpj: '26.224.938/0001-89',
-  contact_email: 'contato@sowbrandbrasil.com.br',
-  phone: '(47) 99197-6742',
-  address: 'Rua Fermino Görll, 115, Reta, São Francisco do Sul - SC',
-  footer_text: 'Todos os direitos reservados.',
-  logo_url: ''
+  contact_email: '',
+  address: '',
+  footer_text: '© Sow Brand - Manager System',
 };
 
-export const CHART_COLORS = ['#72bf03', '#1a1a1a', '#9ca3af', '#3b82f6', '#ef4444'];
+// Configuração de Cores e Ícones para Fornecedores (Item 5)
+export const SUPPLIER_CONFIG: Record<string, { icon: any, color: string }> = {
+  'Malha':           { icon: Layers,    color: 'bg-orange-100 text-orange-800 border-orange-200' },
+  'Modelagem':       { icon: PenTool,   color: 'bg-purple-100 text-purple-800 border-purple-200' },
+  'Corte':           { icon: Scissors,  color: 'bg-red-100 text-red-800 border-red-200' },
+  'Costura':         { icon: Shirt,     color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  'Bordado':         { icon: Stamp,     color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+  'Estampa Silk':    { icon: Palette,   color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+  'Impressão DTF':   { icon: Printer,   color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
+  'Prensa DTF':      { icon: Factory,   color: 'bg-teal-100 text-teal-800 border-teal-200' },
+  'Acabamento':      { icon: Package,   color: 'bg-green-100 text-green-800 border-green-200' },
+  'Outros':          { icon: Factory,   color: 'bg-gray-100 text-gray-800 border-gray-200' }
+};
+
+// Opções de Status com Cores (Item 4)
+export const STATUS_OPTIONS = [
+  { value: 'Pendente', label: 'Pend.', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+  { value: 'Andam.',    label: 'Andam.', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+  { value: 'OK',        label: 'OK',    color: 'bg-green-100 text-green-800 border-green-300' },
+  { value: 'Atras.',    label: 'Atras.', color: 'bg-red-100 text-red-800 border-red-300' },
+];
