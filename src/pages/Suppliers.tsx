@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Factory, MapPin, Phone, FileText } from 'lucide-react';
+import { Plus, Trash2, Edit2, Factory, MapPin, FileText } from 'lucide-react'; // REMOVIDO: Phone
 import { supabase } from '../supabaseClient';
 import type { Supplier } from '../types';
 

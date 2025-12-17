@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Filter, Search } from 'lucide-react';
+import { Plus, Search } from 'lucide-react'; // REMOVIDO: Filter
 import { supabase } from '../supabaseClient';
 import type { ProductionOrder, Client } from '../types';
 
@@ -8,7 +8,7 @@ const Production: React.FC = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newOrder, setNewOrder] = useState({ 
-    order_number: '', // ID Manual
+    order_number: '', 
     client_id: '', 
     product_name: '', 
     quantity: 0, 
