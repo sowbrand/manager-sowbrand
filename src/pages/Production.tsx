@@ -10,7 +10,7 @@ import { gapi } from 'gapi-script';
 // ⚠️ COLE SUAS CHAVES AQUI DENTRO DAS ASPAS:
 const CLIENT_ID = "839855666704-3mb0lgpmrk2mi4a812d6q2p7rtukem9f.apps.googleusercontent.com"; 
 const API_KEY = "CAIzaSyCljCB6lkuZCA-1eNRtwie9k5KwQ8X5IB0"; 
-const SPREADSHEET_ID = "1c1nK9T3KK0wGI8sb8uJx_lJ2junAs1U_R-Xyz1KovP4ANILHA_AQUI"; 
+const SPREADSHEET_ID = "1c1nK9T3KK0wGI8sb8uJx_lJ2junAs1U_R-Xyz1KovP4"; 
 
 // Não mexer aqui (Configurações internas do Google)
 const SCOPES = "https://www.googleapis.com/auth/spreadsheets"; 
