@@ -5,7 +5,7 @@ import type { ProductionOrder, Client, Supplier } from '../types';
 import { STATUS_OPTIONS } from '../constants';
 import * as XLSX from 'xlsx';
 
-// --- Componentes de Edição ---
+// --- Componentes de Edição (Tela do Gestor) ---
 
 const EditableStatusCell = ({ status, onUpdate }: { status: string | undefined, onUpdate: (val: string) => void }) => {
   const currentStatus = STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0];
@@ -75,7 +75,6 @@ const Production: React.FC = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // Controle de Interface
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [activeTabFilter, setActiveTabFilter] = useState('Todos'); 
   const [searchTerm, setSearchTerm] = useState('');
@@ -83,14 +82,14 @@ const Production: React.FC = () => {
   const [newOrder, setNewOrder] = useState({ order_number: '', client_id: '', product_name: '', quantity: 0 });
 
   const stageColumns = [
-    { key: 'modeling', label: 'Modelagem', short: 'Modelagem', category: 'Modelagem' },
-    { key: 'cut', label: 'Corte', short: 'Corte', category: 'Corte' },
-    { key: 'sew', label: 'Costura', short: 'Costura', category: 'Costura' },
-    { key: 'embroidery', label: 'Bordado', short: 'Bordado', category: 'Bordado' },
-    { key: 'silk', label: 'Silk', short: 'Silk', category: 'Estampa Silk' },
-    { key: 'dtf_print', label: 'DTF Print', short: 'DTF Print', category: 'Impressão DTF' },
-    { key: 'dtf_press', label: 'DTF Press', short: 'DTF Press', category: 'Prensa DTF' },
-    { key: 'finish', label: 'Acabamento', short: 'Acabamento', category: 'Acabamento' },
+    { key: 'modeling', label: 'Modelagem', short: 'Mod', category: 'Modelagem' },
+    { key: 'cut', label: 'Corte', short: 'Cor', category: 'Corte' },
+    { key: 'sew', label: 'Costura', short: 'Cos', category: 'Costura' },
+    { key: 'embroidery', label: 'Bordado', short: 'Bor', category: 'Bordado' },
+    { key: 'silk', label: 'Silk', short: 'Sil', category: 'Estampa Silk' },
+    { key: 'dtf_print', label: 'DTF Print', short: 'Prt', category: 'Impressão DTF' },
+    { key: 'dtf_press', label: 'DTF Press', short: 'Pre', category: 'Prensa DTF' },
+    { key: 'finish', label: 'Acabamento', short: 'Aca', category: 'Acabamento' },
   ];
 
   const fetchData = useCallback(async () => {
@@ -130,7 +129,7 @@ const Production: React.FC = () => {
     if (!error) { setIsModalOpen(false); fetchData(); setNewOrder({ order_number: '', client_id: '', product_name: '', quantity: 0 }); }
   };
 
-  // --- Lógica de Filtros ---
+  // Lógica de Filtros
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
       order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -147,7 +146,7 @@ const Production: React.FC = () => {
     return matchesSearch && matchesTab;
   });
 
-  // --- Exportação Excel ---
+  // Exportação Excel
   const exportToExcel = () => {
     const dataToExport = filteredOrders.map(order => {
       const row: any = {
@@ -166,10 +165,7 @@ const Production: React.FC = () => {
     });
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const wscols = [
-      { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 5 }, 
-      ...stageColumns.flatMap(() => [{ wch: 12 }, { wch: 15 }, { wch: 12 }]) 
-    ];
+    const wscols = [ { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 5 } ];
     worksheet['!cols'] = wscols;
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Produção");
@@ -188,182 +184,243 @@ const Production: React.FC = () => {
     return 'bg-gray-200';
   };
 
+  // Helper para formatar data BR no relatório
+  const formatDateBR = (dateStr: string | undefined) => {
+    if (!dateStr) return '-';
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}`;
+  }
+
+  // Helper para cor do texto no relatório
+  const getStatusTextClass = (status: string | undefined) => {
+    if (status === 'OK') return 'text-green-700 bg-green-50 border-green-200';
+    if (status === 'Atras.') return 'text-red-700 bg-red-50 border-red-200';
+    if (status === 'Andam.') return 'text-blue-700 bg-blue-50 border-blue-200';
+    return 'text-gray-500 bg-gray-50 border-gray-200';
+  }
+
   return (
     <div className="space-y-6">
-      {/* CSS Específico para Impressão */}
+      {/* --- CSS DE IMPRESSÃO OTIMIZADO --- */}
       <style>{`
         @media print {
-          @page { size: landscape; margin: 5mm; }
-          body * { visibility: hidden; }
-          #production-print-area, #production-print-area * { visibility: visible; }
-          /* CORREÇÃO DO PDF: Removemos position:absolute e usamos static para permitir múltiplas páginas */
-          #production-print-area { position: static; width: 100%; display: block; overflow: visible; }
-          .no-print { display: none !important; }
-          /* Força quebra de página correta - cada pedido é um bloco */
-          .print-block { 
-            display: block !important; 
-            break-inside: avoid; 
-            page-break-inside: avoid; 
-            border: 1px solid #ccc; 
-            margin-bottom: 10px; 
-            padding: 5px; 
-            border-radius: 4px;
-            font-size: 10px; /* Reduz fonte para caber mais */
-          }
-          .print-hidden { display: none !important; }
-          /* Mostra os detalhes ao imprimir mesmo se estiver fechado na tela */
-          .details-area { display: block !important; } 
+          @page { size: landscape; margin: 10mm; }
+          body { background: white; -webkit-print-color-adjust: exact; }
+          /* Esconde TUDO da interface normal */
+          .ui-only, nav, header, aside, button, input { display: none !important; }
+          /* Mostra APENAS o container de relatório */
+          #print-report-container { display: block !important; width: 100%; position: absolute; top: 0; left: 0; }
+          
+          /* Estilo do Relatório Impresso */
+          .report-header { border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+          .report-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; } /* 2 Pedidos por linha se couber */
+          .report-card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; page-break-inside: avoid; background: #fff; }
+          .report-card-header { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+          .report-stages-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+          .report-stage-box { border: 1px solid #eee; padding: 4px; border-radius: 4px; text-align: center; }
         }
       `}</style>
 
-      {/* Header e Ações */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
-        <div className="relative w-full md:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input 
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg outline-none focus:border-sow-green" 
-            placeholder="Buscar por cliente, pedido..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        
-        <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
-          <button onClick={exportToExcel} className="px-3 py-2 border border-green-200 text-green-700 bg-green-50 rounded-lg flex items-center gap-2 hover:bg-green-100 whitespace-nowrap">
-            <Download size={16}/> <span className="hidden sm:inline">Excel</span>
-          </button>
-          <button onClick={() => window.print()} className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg flex items-center gap-2 hover:bg-gray-50 whitespace-nowrap">
-            <Printer size={16}/> <span className="hidden sm:inline">PDF</span>
-          </button>
-          <button onClick={() => setIsModalOpen(true)} className="bg-sow-green text-sow-dark px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:brightness-90 whitespace-nowrap">
-            <Plus size={18}/> Novo
-          </button>
-        </div>
-      </div>
-
-      {/* Filtros Rápidos */}
-      <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar no-print">
-        {[
-          { label: 'Todos', val: 'Todos', icon: Filter },
-          { label: 'Atrasados', val: 'Atras.', icon: AlertCircle, color: 'bg-red-100 text-red-700 border-red-200' },
-          { label: 'Em Andamento', val: 'Andam.', icon: Clock, color: 'bg-blue-100 text-blue-700 border-blue-200' },
-          { label: 'Concluídos', val: 'OK', icon: CheckCircle, color: 'bg-green-100 text-green-700 border-green-200' },
-        ].map(filter => (
-          <button
-            key={filter.val}
-            onClick={() => setActiveTabFilter(filter.val)}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 border transition-all whitespace-nowrap ${
-              activeTabFilter === filter.val 
-                ? 'bg-sow-dark text-white border-sow-dark' 
-                : filter.color || 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            {filter.icon && <filter.icon size={14} />}
-            {filter.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Lista Inteligente (Accordion) */}
-      <div id="production-print-area" className="space-y-3">
-        {filteredOrders.length === 0 && <div className="text-center text-gray-500 py-10">Nenhum pedido encontrado.</div>}
-        
-        {filteredOrders.map((order) => {
-          const isExpanded = expandedOrderId === order.id;
+      {/* --- ÁREA DE TRABALHO (UI) --- */}
+      <div className="ui-only">
+        {/* Header e Ações */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+          <div className="relative w-full md:w-80">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input 
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg outline-none focus:border-sow-green" 
+              placeholder="Buscar por cliente, pedido..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
           
-          return (
-            <div key={order.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden print-block">
-              {/* Cabeçalho do Card */}
-              <div 
-                onClick={() => toggleRow(order.id)}
-                className="p-4 flex flex-col md:flex-row items-center justify-between gap-4 cursor-pointer hover:bg-gray-50 transition-colors"
-              >
-                {/* Info Principal (Esquerda Fixa) */}
-                <div className="flex items-center gap-4 w-full md:w-1/4 shrink-0">
-                  <div className={`p-2 rounded-lg font-bold text-sm bg-gray-100 text-sow-dark border border-gray-200 whitespace-nowrap`}>
-                    {order.order_number}
+          <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
+            <button onClick={exportToExcel} className="px-3 py-2 border border-green-200 text-green-700 bg-green-50 rounded-lg flex items-center gap-2 hover:bg-green-100 whitespace-nowrap">
+              <Download size={16}/> <span className="hidden sm:inline">Excel</span>
+            </button>
+            <button onClick={() => window.print()} className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg flex items-center gap-2 hover:bg-gray-50 whitespace-nowrap">
+              <Printer size={16}/> <span className="hidden sm:inline">PDF Cliente</span>
+            </button>
+            <button onClick={() => setIsModalOpen(true)} className="bg-sow-green text-sow-dark px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:brightness-90 whitespace-nowrap">
+              <Plus size={18}/> Novo
+            </button>
+          </div>
+        </div>
+
+        {/* Filtros Rápidos */}
+        <div className="flex gap-2 overflow-x-auto pb-4 custom-scrollbar">
+          {[
+            { label: 'Todos', val: 'Todos', icon: Filter },
+            { label: 'Atrasados', val: 'Atras.', icon: AlertCircle, color: 'bg-red-100 text-red-700 border-red-200' },
+            { label: 'Em Andamento', val: 'Andam.', icon: Clock, color: 'bg-blue-100 text-blue-700 border-blue-200' },
+            { label: 'Concluídos', val: 'OK', icon: CheckCircle, color: 'bg-green-100 text-green-700 border-green-200' },
+          ].map(filter => (
+            <button
+              key={filter.val}
+              onClick={() => setActiveTabFilter(filter.val)}
+              className={`px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 border transition-all whitespace-nowrap ${
+                activeTabFilter === filter.val 
+                  ? 'bg-sow-dark text-white border-sow-dark' 
+                  : filter.color || 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {filter.icon && <filter.icon size={14} />}
+              {filter.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Lista Accordion */}
+        <div className="space-y-3">
+          {filteredOrders.map((order) => {
+            const isExpanded = expandedOrderId === order.id;
+            return (
+              <div key={order.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                <div 
+                  onClick={() => toggleRow(order.id)}
+                  className="p-4 flex flex-col md:flex-row items-center justify-between gap-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-4 w-full md:w-1/4 shrink-0">
+                    <div className={`p-2 rounded-lg font-bold text-sm bg-gray-100 text-sow-dark border border-gray-200 whitespace-nowrap`}>
+                      {order.order_number}
+                    </div>
+                    <div className="overflow-hidden">
+                      <h3 className="font-bold text-gray-900 text-sm truncate">{order.product_name}</h3>
+                      <p className="text-xs text-gray-500 truncate">{order.clients?.company_name || 'Cliente S/ Nome'}</p>
+                    </div>
                   </div>
-                  <div className="overflow-hidden">
-                    <h3 className="font-bold text-gray-900 text-sm truncate" title={order.product_name}>{order.product_name}</h3>
-                    <p className="text-xs text-gray-500 truncate" title={order.clients?.company_name}>{order.clients?.company_name || 'Cliente S/ Nome'}</p>
+
+                  <div className="flex-1 flex items-center justify-center gap-4 overflow-x-auto w-full">
+                    {stageColumns.map(stage => {
+                      const status = order.stages?.[stage.key as keyof typeof order.stages]?.status;
+                      return (
+                        <div key={stage.key} className="flex flex-col items-center gap-1 min-w-[30px]">
+                          <div className={`w-4 h-4 rounded-full ${getStatusColor(status)} shadow-sm`} title={`${stage.label}: ${status || 'Pendente'}`}></div>
+                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter">{stage.short}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center gap-6 md:justify-end w-full md:w-auto shrink-0">
+                    <div className="text-right">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Qtd</span>
+                      <span className="font-bold text-lg">{order.quantity}</span>
+                    </div>
+                    <div>
+                      {isExpanded ? <ChevronUp size={20} className="text-gray-400"/> : <ChevronDown size={20} className="text-gray-400"/>}
+                    </div>
                   </div>
                 </div>
 
-                {/* Status Visual (Centro - Expansível) */}
-                {/* CORREÇÃO ITEM 1: flex-1 para ocupar o espaço central, gap-3 para separar, justify-center */}
-                <div className="flex-1 flex items-center justify-center gap-4 overflow-x-auto w-full no-print">
-                  {stageColumns.map(stage => {
-                    const status = order.stages?.[stage.key as keyof typeof order.stages]?.status;
-                    return (
-                      <div key={stage.key} className="flex flex-col items-center gap-1 min-w-[30px]">
-                        {/* Bolinha Aumentada 30% (w-4 h-4) */}
-                        <div className={`w-4 h-4 rounded-full ${getStatusColor(status)} shadow-sm`} title={`${stage.label}: ${status || 'Pendente'}`}></div>
-                        {/* Texto Completo (usando short name ajustado) */}
-                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter">{stage.short}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+                {isExpanded && (
+                  <div className="border-t border-gray-100 bg-gray-50 p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                      {stageColumns.map(stage => {
+                        const stageData = order.stages?.[stage.key as keyof typeof order.stages];
+                        return (
+                          <div key={stage.key} className="bg-white p-3 rounded border border-gray-200 shadow-sm">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase mb-2 border-b border-gray-100 pb-1 flex justify-between items-center">
+                              {stage.label}
+                              {stageData?.status === 'Atras.' && <AlertCircle size={12} className="text-red-500"/>}
+                            </p>
+                            <div className="space-y-2">
+                              <EditableSupplierCell 
+                                current={stageData?.provider} 
+                                category={stage.category}
+                                stageKey={stage.key}
+                                suppliers={suppliers}
+                                onUpdate={(val) => updateOrderStage(order.id, stage.key, 'provider', val)}
+                              />
+                              <div className="flex gap-2">
+                                <EditableDateCell 
+                                  date={stageData?.date_in}
+                                  onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_in', val)}
+                                />
+                                <EditableDateCell 
+                                  date={stageData?.date_out}
+                                  onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_out', val)}
+                                />
+                              </div>
+                              <EditableStatusCell 
+                                status={stageData?.status}
+                                onUpdate={(val) => updateOrderStage(order.id, stage.key, 'status', val)}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
-                {/* Quantidade (Direita Fixa) */}
-                <div className="flex items-center gap-6 md:justify-end w-full md:w-auto shrink-0">
-                  <div className="text-right">
-                    <span className="text-[10px] text-gray-400 uppercase font-bold block">Qtd</span>
-                    <span className="font-bold text-lg">{order.quantity}</span>
-                  </div>
-                  <div className="no-print">
-                    {isExpanded ? <ChevronUp size={20} className="text-gray-400"/> : <ChevronDown size={20} className="text-gray-400"/>}
-                  </div>
+      {/* --- ÁREA DE RELATÓRIO PDF (Oculta na Tela, Visível na Impressão) --- */}
+      <div id="print-report-container" className="hidden">
+        <div className="report-header">
+          <div>
+            <h1 className="text-2xl font-bold uppercase tracking-wide">Relatório de Produção</h1>
+            <p className="text-sm text-gray-500">Sow Brand Manager</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-gray-400">Gerado em</p>
+            <p className="font-bold">{new Date().toLocaleDateString()}</p>
+          </div>
+        </div>
+
+        <div className="report-grid">
+          {filteredOrders.map(order => (
+            <div key={order.id} className="report-card">
+              {/* Cabeçalho do Card de Relatório */}
+              <div className="report-card-header">
+                <div>
+                  <span className="text-xs font-bold bg-black text-white px-2 py-0.5 rounded">{order.order_number}</span>
+                  <span className="text-sm font-bold ml-2">{order.product_name}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-gray-500">Qtd: </span>
+                  <span className="font-bold text-sm">{order.quantity}</span>
                 </div>
               </div>
+              <div className="mb-2 text-xs text-gray-500 font-bold uppercase tracking-wider">{order.clients?.company_name}</div>
 
-              {/* Área de Detalhes (Expandida) */}
-              {/* A classe 'details-area' força a exibição no print mesmo se fechado */}
-              <div className={`details-area border-t border-gray-100 bg-gray-50 p-4 ${isExpanded ? 'block' : 'hidden'}`}>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                  {stageColumns.map(stage => {
-                    const stageData = order.stages?.[stage.key as keyof typeof order.stages];
-                    return (
-                      <div key={stage.key} className="bg-white p-3 rounded border border-gray-200 shadow-sm print:shadow-none print:border-gray-300">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-2 border-b border-gray-100 pb-1 flex justify-between items-center">
-                          {stage.label}
-                          {stageData?.status === 'Atras.' && <AlertCircle size={12} className="text-red-500"/>}
-                        </p>
-                        <div className="space-y-2">
-                          <EditableSupplierCell 
-                            current={stageData?.provider} 
-                            category={stage.category}
-                            stageKey={stage.key}
-                            suppliers={suppliers}
-                            onUpdate={(val) => updateOrderStage(order.id, stage.key, 'provider', val)}
-                          />
-                          <div className="flex gap-2">
-                            <EditableDateCell 
-                              date={stageData?.date_in}
-                              onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_in', val)}
-                            />
-                            <EditableDateCell 
-                              date={stageData?.date_out}
-                              onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_out', val)}
-                            />
-                          </div>
-                          <EditableStatusCell 
-                            status={stageData?.status}
-                            onUpdate={(val) => updateOrderStage(order.id, stage.key, 'status', val)}
-                          />
-                        </div>
+              {/* Grid de Etapas para Impressão (SEM FORNECEDOR) */}
+              <div className="report-stages-grid">
+                {stageColumns.map(stage => {
+                  const sData = order.stages?.[stage.key as keyof typeof order.stages];
+                  const status = sData?.status || 'Pendente';
+                  return (
+                    <div key={stage.key} className="report-stage-box">
+                      <div className="text-[8px] text-gray-400 uppercase font-bold mb-1">{stage.short}</div>
+                      
+                      <div className={`text-[9px] border rounded px-1 py-0.5 mb-1 font-bold ${getStatusTextClass(status)}`}>
+                        {status}
                       </div>
-                    );
-                  })}
-                </div>
+                      
+                      <div className="text-[8px] text-gray-600">
+                        {formatDateBR(sData?.date_in)} - {formatDateBR(sData?.date_out)}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          );
-        })}
+          ))}
+        </div>
+        
+        <div className="mt-8 pt-4 border-t border-gray-300 text-center text-[10px] text-gray-400">
+          Este relatório é gerado automaticamente pelo sistema da Sow Brand.
+        </div>
       </div>
 
+      {/* Modal Novo Pedido */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 no-print">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 ui-only">
           <form onSubmit={handleCreate} className="bg-white p-6 rounded-lg w-full max-w-md space-y-4 shadow-xl">
              <h3 className="font-bold text-lg">Novo Pedido</h3>
              <div className="grid grid-cols-2 gap-4">
