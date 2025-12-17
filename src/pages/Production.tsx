@@ -23,7 +23,7 @@ const Production: React.FC = () => {
     e.preventDefault();
     await supabase.from('production_orders').insert([newOrder]);
     setIsModalOpen(false);
-    window.location.reload(); // Refresh simples
+    window.location.reload(); 
   };
 
   const StatusBadge = ({ status }: { status?: string }) => {
@@ -33,7 +33,8 @@ const Production: React.FC = () => {
     return <span className="border border-gray-200 text-gray-400 px-2 py-0.5 rounded text-xs">Pend.</span>;
   };
 
-  const StageColumns = ({ title, data }: { title: string, data: any }) => (
+  // CORREÇÃO AQUI: Removemos o 'title' que não estava sendo usado
+  const StageColumns = ({ data }: { data: any }) => (
     <>
       <td className="p-3 border-l min-w-[120px] text-xs text-gray-600 truncate">{data?.provider || '-'}</td>
       <td className="p-3 min-w-[100px] text-xs text-gray-500 text-center">{data?.date_in || '-'}</td>
@@ -102,15 +103,15 @@ const Production: React.FC = () => {
                     </span>
                   </td>
                   
-                  {/* Etapas */}
-                  <StageColumns title="Modelagem" data={order.stages?.modeling} />
-                  <StageColumns title="Corte" data={order.stages?.cut} />
-                  <StageColumns title="Costura" data={order.stages?.sew} />
-                  <StageColumns title="Bordado" data={order.stages?.embroidery} />
-                  <StageColumns title="Silk" data={order.stages?.silk} />
-                  <StageColumns title="DTF Print" data={order.stages?.dtf_print} />
-                  <StageColumns title="DTF Press" data={order.stages?.dtf_press} />
-                  <StageColumns title="Acabamento" data={order.stages?.finish} />
+                  {/* Etapas - Removemos a prop title=... que não existe mais */}
+                  <StageColumns data={order.stages?.modeling} />
+                  <StageColumns data={order.stages?.cut} />
+                  <StageColumns data={order.stages?.sew} />
+                  <StageColumns data={order.stages?.embroidery} />
+                  <StageColumns data={order.stages?.silk} />
+                  <StageColumns data={order.stages?.dtf_print} />
+                  <StageColumns data={order.stages?.dtf_press} />
+                  <StageColumns data={order.stages?.finish} />
                 </tr>
               ))}
             </tbody>
