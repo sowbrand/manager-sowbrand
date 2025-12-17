@@ -1,19 +1,30 @@
+export interface ProductionStageData {
+  provider?: string;    // Fornecedor
+  date_in?: string;     // Ent.
+  date_out?: string;    // Sai.
+  status: 'Pendente' | 'Andam.' | 'OK' | 'Atras.' | 'Prob.';
+}
+
+export interface ProductionStages {
+  modeling?: ProductionStageData; // Modelagem
+  cut?: ProductionStageData;      // Corte
+  sew?: ProductionStageData;      // Costura
+  print?: ProductionStageData;    // Estampa/Silk
+  finish?: ProductionStageData;   // Acabamento
+}
+
 export interface ProductionOrder {
   id: string;
   created_at: string;
   order_number: number;
   client_id: string;
-  clients?: { name: string; company_name: string };
+  clients?: { name: string; company_name: string }; // Join do Supabase
   product_name: string;
   quantity: number;
+  origin_model: string; // 'Sow Brand' ou 'Cliente'
   status: string;
   deadline: string;
-  stages: {
-    cut: string;    // Corte
-    sew: string;    // Costura
-    print: string;  // Estampa
-    finish: string; // Acabamento
-  };
+  stages: ProductionStages; // O JSONB que criamos
 }
 
 export interface Client {
@@ -31,7 +42,7 @@ export interface Supplier {
   id: string;
   created_at: string;
   name: string;
-  category: string;
+  category: string; // Ex: 'Tecidos', 'Costura'
   contact_info: string;
   status: 'Ativo' | 'Inativo';
 }
