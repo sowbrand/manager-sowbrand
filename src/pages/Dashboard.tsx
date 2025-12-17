@@ -5,7 +5,6 @@ import { supabase } from '../supabaseClient';
 
 const Dashboard: React.FC = () => {
   const [stats, setStats] = useState({ active: 0, pieces: 0, delivered: 0, late: 0 });
-  // Inicializa zerado
   const [barData, setBarData] = useState([
     { name: 'Corte', qtd: 0, fill: '#F472B6' },
     { name: 'Costura', qtd: 0, fill: '#60A5FA' },
@@ -21,17 +20,14 @@ const Dashboard: React.FC = () => {
       const { data: orders } = await supabase.from('production_orders').select('*');
       
       if (orders && orders.length > 0) {
-        // 1. Cálculos dos Cards
         const active = orders.filter(o => o.status !== 'Entregue').length;
         const pieces = orders.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
         const delivered = orders.filter(o => o.status === 'Entregue').length;
         const late = orders.filter(o => o.deadline && new Date(o.deadline) < new Date() && o.status !== 'Entregue').length;
         setStats({ active, pieces, delivered, late });
 
-        // 2. Cálculo Real do Gráfico de Barras (Soma peças onde a etapa não está 'Pendente')
         const calcStage = (stageName: string) => {
           return orders.reduce((acc, order) => {
-             // Verifica se a etapa existe e não é pendente
              const stageStatus = order.stages?.[stageName]?.status;
              if (stageStatus && stageStatus !== 'Pendente') {
                return acc + (order.quantity || 0);
@@ -44,11 +40,10 @@ const Dashboard: React.FC = () => {
           { name: 'Corte', qtd: calcStage('cut'), fill: '#F472B6' },
           { name: 'Costura', qtd: calcStage('sew'), fill: '#60A5FA' },
           { name: 'Silk', qtd: calcStage('silk'), fill: '#FBBF24' },
-          { name: 'DTF', qtd: calcStage('dtf_print'), fill: '#2DD4BF' }, // Somando DTF Print
+          { name: 'DTF', qtd: calcStage('dtf_print'), fill: '#2DD4BF' },
           { name: 'Acab.', qtd: calcStage('finish'), fill: '#A78BFA' },
         ]);
       } else {
-        // Se não tem ordens, garante tudo zerado
         setStats({ active: 0, pieces: 0, delivered: 0, late: 0 });
         setBarData(d => d.map(item => ({ ...item, qtd: 0 })));
       }
@@ -57,7 +52,7 @@ const Dashboard: React.FC = () => {
   }, []);
   
   const pieData = [
-    { name: 'Atenção', value: stats.active }, // Usando dados reais simplificados para exemplo
+    { name: 'Atenção', value: stats.active },
     { name: 'Atrasado', value: stats.late }, 
     { name: 'Em dia', value: stats.delivered },
   ];

@@ -9,23 +9,24 @@ const Production: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newOrder, setNewOrder] = useState({ client_id: '', product_name: '', quantity: 0, origin_model: 'Sow Brand' });
 
+  // Função para buscar dados (usada no inicio e após criar)
+  const fetchData = async () => {
+    const { data: ords } = await supabase.from('production_orders').select('*, clients(name, company_name)').order('created_at', { ascending: false });
+    const { data: clis } = await supabase.from('clients').select('*');
+    if (ords) setOrders(ords);
+    if (clis) setClients(clis);
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      const { data: ords } = await supabase.from('production_orders').select('*, clients(name, company_name)').order('created_at', { ascending: false });
-      const { data: clis } = await supabase.from('clients').select('*');
-      if (ords) setOrders(ords);
-      if (clis) setClients(clis);
-    };
     fetchData();
   }, []);
 
-  cconst handleCreate = async (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     await supabase.from('production_orders').insert([newOrder]);
     setIsModalOpen(false);
-    // Substituido reload() por nova busca de dados para evitar 404
-    const { data: ords } = await supabase.from('production_orders').select('*, clients(name, company_name)').order('created_at', { ascending: false });
-    if (ords) setOrders(ords);
+    // Atualiza a lista sem recarregar a página (Evita erro 404)
+    fetchData();
   };
 
   const StatusBadge = ({ status }: { status?: string }) => {
@@ -35,7 +36,6 @@ const Production: React.FC = () => {
     return <span className="border border-gray-200 text-gray-400 px-2 py-0.5 rounded text-xs">Pend.</span>;
   };
 
-  // CORREÇÃO AQUI: Removemos o 'title' que não estava sendo usado
   const StageColumns = ({ data }: { data: any }) => (
     <>
       <td className="p-3 border-l min-w-[120px] text-xs text-gray-600 truncate">{data?.provider || '-'}</td>
@@ -47,7 +47,6 @@ const Production: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Topo */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -63,12 +62,10 @@ const Production: React.FC = () => {
         </div>
       </div>
 
-      {/* Tabela Complexa */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
         <div className="overflow-x-auto custom-scrollbar pb-4">
           <table className="w-full text-left border-collapse">
             <thead>
-              {/* Grupo de Colunas */}
               <tr className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
                 <th className="p-4 min-w-[200px] border-b" rowSpan={2}>Pedido / Cliente</th>
                 <th className="p-4 min-w-[150px] border-b" rowSpan={2}>Produto</th>
@@ -78,7 +75,6 @@ const Production: React.FC = () => {
                   <th key={stage} className="p-2 border-l border-b text-center min-w-[300px]" colSpan={4}>{stage}</th>
                 ))}
               </tr>
-              {/* Sub-colunas */}
               <tr className="bg-gray-50 text-[10px] font-bold text-gray-400 uppercase border-b">
                 {Array(8).fill(null).map((_, i) => (
                   <React.Fragment key={i}>
@@ -105,7 +101,6 @@ const Production: React.FC = () => {
                     </span>
                   </td>
                   
-                  {/* Etapas - Removemos a prop title=... que não existe mais */}
                   <StageColumns data={order.stages?.modeling} />
                   <StageColumns data={order.stages?.cut} />
                   <StageColumns data={order.stages?.sew} />
@@ -121,11 +116,6 @@ const Production: React.FC = () => {
         </div>
         <div className="bg-gray-50 p-3 border-t border-gray-200 text-xs text-gray-500 flex justify-between items-center">
           <span>Mostrando {orders.length} pedidos</span>
-          <div className="flex gap-1">
-             <span className="w-2 h-2 rounded-full bg-gray-300"></span>
-             <span className="w-2 h-2 rounded-full bg-gray-300"></span>
-             <span className="w-8 h-2 rounded-full bg-gray-400"></span>
-          </div>
         </div>
       </div>
 

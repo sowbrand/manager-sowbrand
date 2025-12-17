@@ -25,7 +25,7 @@ const Suppliers: React.FC = () => {
     const { error } = await supabase.from('suppliers').upsert([formData]);
     if (!error) {
       setIsModalOpen(false);
-      fetchSuppliers(); // Atualiza sem reload
+      fetchSuppliers();
       setFormData({});
     }
   };

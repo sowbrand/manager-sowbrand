@@ -19,32 +19,32 @@ const Clients: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // upsert: Se tiver ID atualiza, se não tiver cria novo
     const { error } = await supabase.from('clients').upsert([formData]);
     
     if (error) {
       alert('Erro ao salvar');
     } else {
       setIsModalOpen(false);
-      fetchClients(); // Atualiza a lista sem recarregar a página (Fim do erro 404)
-      setFormData({}); // Limpa o formulário
+      fetchClients(); 
+      setFormData({}); 
     }
   };
 
+  // Função para abrir modal de edição
   const handleEdit = (client: Client) => {
-    setFormData(client); // Preenche o form com os dados do cliente
-    setIsModalOpen(true); // Abre a janela
+    setFormData(client);
+    setIsModalOpen(true);
   };
 
   const handleDelete = async (id: string) => {
     if (confirm('Excluir cliente?')) {
       await supabase.from('clients').delete().eq('id', id);
-      fetchClients(); // Atualiza a lista
+      fetchClients(); 
     }
   };
 
   const openNew = () => {
-    setFormData({}); // Garante formulário limpo para novo
+    setFormData({});
     setIsModalOpen(true);
   }
 
@@ -88,7 +88,6 @@ const Clients: React.FC = () => {
                 </td>
                 <td className="p-4 text-right align-top">
                   <div className="flex justify-end gap-2">
-                    {/* Botão de Editar agora funciona */}
                     <button onClick={() => handleEdit(client)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg"><Edit2 size={18} /></button>
                     <button onClick={() => handleDelete(client.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={18} /></button>
                   </div>
@@ -104,7 +103,6 @@ const Clients: React.FC = () => {
           <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg w-full max-w-md space-y-4">
              <h3 className="font-bold text-lg">{formData.id ? 'Editar Cliente' : 'Novo Cliente'}</h3>
              
-             {/* Campos controlados pelo formData */}
              <input required placeholder="Nome / Marca" className="w-full p-2 border rounded" 
                     value={formData.company_name || ''} 
                     onChange={e => setFormData({...formData, company_name: e.target.value})} />
