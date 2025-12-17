@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Trash2, Edit2, X, Phone, Mail, FileText } from 'lucide-react';
+import { Plus, Search, Trash2, Phone, Mail, FileText } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import type { Client } from '../types';
 
