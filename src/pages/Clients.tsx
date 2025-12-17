@@ -1,104 +1,97 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Trash2, Edit2, Phone, Mail, FileText } from 'lucide-react'; // Edit2 está aqui e será usado
+import { Plus, Search, Trash2, Edit2, Phone, Mail } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import type { Client } from '../types';
 
 const Clients: React.FC = () => {
   const [clients, setClients] = useState<Client[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<Client>>({});
 
-  const fetchClients = async () => {
-    setLoading(true);
-    const { data } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
-    if (data) setClients(data);
-    setLoading(false);
-  };
-
-  useEffect(() => { fetchClients(); }, []);
+  useEffect(() => {
+    const fetch = async () => {
+      const { data } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
+      if (data) setClients(data);
+    };
+    fetch();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await supabase.from('clients').insert([formData]);
     setIsModalOpen(false);
-    fetchClients();
+    window.location.reload();
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Deseja excluir este cliente?')) {
+    if (confirm('Excluir cliente?')) {
       await supabase.from('clients').delete().eq('id', id);
-      fetchClients();
+      window.location.reload();
     }
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold text-sow-black">Clientes</h1>
-        <button onClick={() => setIsModalOpen(true)} className="bg-sow-green text-white px-6 py-2.5 rounded-lg flex items-center gap-2 font-bold shadow-lg shadow-green-200 hover:bg-green-600 transition-all">
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div className="relative w-full max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+          <input className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg outline-none focus:border-sow-green" placeholder="Buscar clientes..." />
+        </div>
+        <button onClick={() => setIsModalOpen(true)} className="bg-sow-green text-sow-dark px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:brightness-95">
           <Plus size={20} /> Novo Cliente
         </button>
       </div>
 
-      {/* Barra de Busca Estilizada */}
-      <div className="bg-white p-2 rounded-xl border border-gray-100 mb-8 shadow-sm max-w-2xl">
-        <div className="relative flex items-center">
-          <Search className="absolute left-4 text-gray-400" size={20} />
-          <input 
-            className="w-full pl-12 pr-4 py-3 rounded-lg outline-none text-gray-600 placeholder-gray-400"
-            placeholder="Buscar clientes por nome ou empresa..."
-          />
-        </div>
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold uppercase text-xs">
+            <tr>
+              <th className="p-4">Nome / Marca</th>
+              <th className="p-4">Contato</th>
+              <th className="p-4">Observações</th>
+              <th className="p-4 text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {clients.map(client => (
+              <tr key={client.id} className="hover:bg-gray-50">
+                <td className="p-4 align-top">
+                  <div className="font-bold text-gray-900 text-base">{client.company_name || client.name}</div>
+                  <div className="text-xs text-gray-400 mt-1">ID: {client.id.slice(0, 8)}</div>
+                </td>
+                <td className="p-4 align-top">
+                  <div className="space-y-1 text-sm text-gray-600">
+                    <div className="flex items-center gap-2"><Mail size={14} className="text-gray-400"/> {client.email || '-'}</div>
+                    <div className="flex items-center gap-2"><Phone size={14} className="text-gray-400"/> {client.phone || '-'}</div>
+                  </div>
+                </td>
+                <td className="p-4 align-top">
+                  <p className="text-sm text-gray-600 max-w-xs">{client.observations || '-'}</p>
+                </td>
+                <td className="p-4 text-right align-top">
+                  <div className="flex justify-end gap-2">
+                    <button className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg"><Edit2 size={18} /></button>
+                    <button onClick={() => handleDelete(client.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={18} /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      {/* Grid de Cards */}
-      <div className="space-y-4">
-        {loading ? <p>Carregando...</p> : clients.map(client => (
-          <div key={client.id} className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row justify-between gap-6">
-            
-            {/* Info Principal */}
-            <div className="flex-1">
-              <h3 className="text-lg font-bold text-gray-900 mb-1">{client.company_name || client.name}</h3>
-              <div className="text-xs text-gray-400 font-mono mb-4">ID: {client.id.slice(0, 8)}</div>
-              
-              <div className="space-y-1 text-sm text-gray-600">
-                <div className="flex items-center gap-2"><Mail size={16} className="text-gray-400"/> {client.email || 'Sem email'}</div>
-                <div className="flex items-center gap-2"><Phone size={16} className="text-gray-400"/> {client.phone || 'Sem telefone'}</div>
-              </div>
-            </div>
-
-            {/* Observações (Amarelo) */}
-            {client.observations && (
-              <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100 text-sm text-yellow-800 flex items-start gap-3 md:max-w-md">
-                <FileText size={18} className="mt-0.5 shrink-0 opacity-50"/>
-                <p>{client.observations}</p>
-              </div>
-            )}
-
-            {/* Ações */}
-            <div className="flex md:flex-col gap-2 justify-start md:justify-center border-t md:border-t-0 md:border-l border-gray-100 pt-4 md:pt-0 md:pl-6">
-               <button className="p-2 text-blue-400 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
-                 <Edit2 size={20}/>
-               </button>
-               <button onClick={() => handleDelete(client.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors" title="Excluir">
-                 <Trash2 size={20}/>
-               </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Modal igual ao anterior, simplificado para o exemplo */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl w-full max-w-md space-y-4">
-             <h3 className="font-bold">Novo Cliente</h3>
-             <input required placeholder="Nome" className="w-full p-3 border rounded-lg" onChange={e => setFormData({...formData, name: e.target.value})} />
-             <input placeholder="Empresa" className="w-full p-3 border rounded-lg" onChange={e => setFormData({...formData, company_name: e.target.value})} />
-             <input placeholder="Obs" className="w-full p-3 border rounded-lg" onChange={e => setFormData({...formData, observations: e.target.value})} />
-             <button className="w-full bg-sow-green text-white p-3 rounded-lg font-bold">Salvar</button>
-             <button type="button" onClick={() => setIsModalOpen(false)} className="w-full text-gray-500 p-2">Cancelar</button>
+          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg w-full max-w-md space-y-4">
+             <h3 className="font-bold text-lg">Novo Cliente</h3>
+             <input required placeholder="Nome / Marca" className="w-full p-2 border rounded" onChange={e => setFormData({...formData, company_name: e.target.value})} />
+             <input placeholder="Email" className="w-full p-2 border rounded" onChange={e => setFormData({...formData, email: e.target.value})} />
+             <input placeholder="Telefone" className="w-full p-2 border rounded" onChange={e => setFormData({...formData, phone: e.target.value})} />
+             <textarea placeholder="Observações" className="w-full p-2 border rounded" onChange={e => setFormData({...formData, observations: e.target.value})} />
+             <div className="flex gap-2">
+               <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 p-2 border rounded">Cancelar</button>
+               <button type="submit" className="flex-1 p-2 bg-sow-green font-bold rounded">Salvar</button>
+             </div>
           </form>
         </div>
       )}
