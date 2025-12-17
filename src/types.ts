@@ -1,15 +1,9 @@
-export interface ProductionStage {
-  status: 'Pendente' | 'Em Andamento' | 'Concluído' | 'Atrasado';
-  date?: string;
-  supplier?: string;
-}
-
 export interface ProductionOrder {
   id: string;
   created_at: string;
   order_number: number;
   client_id: string;
-  clients?: { name: string; company_name: string }; // Join
+  clients?: { name: string; company_name: string };
   product_name: string;
   quantity: number;
   status: string;
