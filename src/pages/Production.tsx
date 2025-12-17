@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Filter, X, Download, Printer } from 'lucide-react';
+import { Plus, Search, Filter, X, Download, Printer, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import type { ProductionOrder, Client, Supplier } from '../types';
 import { STATUS_OPTIONS } from '../constants';
 import * as XLSX from 'xlsx';
 
-// --- Componentes de Célula Editável ---
+// --- Componentes de Edição (Mantidos para o detalhe) ---
 
 const EditableStatusCell = ({ status, onUpdate }: { status: string | undefined, onUpdate: (val: string) => void }) => {
   const currentStatus = STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0];
@@ -13,7 +13,7 @@ const EditableStatusCell = ({ status, onUpdate }: { status: string | undefined, 
     <select 
       value={status || 'Pendente'} 
       onChange={(e) => onUpdate(e.target.value)}
-      className={`w-full p-1 text-xs border rounded appearance-none cursor-pointer font-bold text-center focus:outline-none focus:ring-2 focus:ring-sow-green ${currentStatus.color} print:border-none print:appearance-none`}
+      className={`w-full p-1.5 text-xs border rounded font-bold text-center focus:outline-none focus:ring-2 focus:ring-sow-green ${currentStatus.color}`}
     >
       {STATUS_OPTIONS.map(option => (
         <option key={option.value} value={option.value} className="bg-white text-gray-800">
@@ -29,7 +29,7 @@ const EditableDateCell = ({ date, onUpdate }: { date: string | undefined, onUpda
     type="date" 
     value={date || ''} 
     onChange={(e) => onUpdate(e.target.value)}
-    className="w-full p-1 text-[10px] border border-gray-200 rounded text-center text-gray-600 focus:border-sow-green focus:outline-none print:border-none"
+    className="w-full p-1.5 text-xs border border-gray-200 rounded text-center text-gray-600 focus:border-sow-green focus:outline-none"
   />
 );
 
@@ -42,7 +42,6 @@ const EditableSupplierCell = ({
   suppliers: Supplier[], 
   onUpdate: (val: string) => void 
 }) => {
-  
   let options: { id: string, name: string }[] = suppliers
     .filter(s => s.category === category)
     .map(s => ({ id: s.id, name: s.name }));
@@ -57,10 +56,10 @@ const EditableSupplierCell = ({
     <select 
       value={current || ''} 
       onChange={(e) => onUpdate(e.target.value)}
-      className="w-full p-1 text-[11px] border border-gray-200 rounded text-gray-700 cursor-pointer focus:border-sow-green focus:outline-none bg-white print:border-none print:appearance-none"
+      className="w-full p-1.5 text-xs border border-gray-200 rounded text-gray-700 focus:border-sow-green focus:outline-none bg-white truncate"
       title={current}
     >
-      <option value="">-</option>
+      <option value="">- Selecione -</option>
       {options.map(opt => (
         <option key={opt.id} value={opt.name}>{opt.name}</option>
       ))}
@@ -68,18 +67,31 @@ const EditableSupplierCell = ({
   );
 };
 
+// --- Componente Principal ---
+
 const Production: React.FC = () => {
   const [orders, setOrders] = useState<ProductionOrder[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  const [showFilters, setShowFilters] = useState(false);
+  // Controle de Interface
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [activeTabFilter, setActiveTabFilter] = useState('Todos'); // Filtros rápidos
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('Todos');
-  const [filterClient, setFilterClient] = useState('Todos');
 
   const [newOrder, setNewOrder] = useState({ order_number: '', client_id: '', product_name: '', quantity: 0 });
+
+  const stageColumns = [
+    { key: 'modeling', label: 'Modelagem', short: 'Mod', category: 'Modelagem' },
+    { key: 'cut', label: 'Corte', short: 'Cor', category: 'Corte' },
+    { key: 'sew', label: 'Costura', short: 'Cos', category: 'Costura' },
+    { key: 'embroidery', label: 'Bordado', short: 'Bor', category: 'Bordado' },
+    { key: 'silk', label: 'Silk', short: 'Sil', category: 'Estampa Silk' },
+    { key: 'dtf_print', label: 'DTF Print', short: 'Prt', category: 'Impressão DTF' },
+    { key: 'dtf_press', label: 'DTF Press', short: 'Pre', category: 'Prensa DTF' },
+    { key: 'finish', label: 'Acabamento', short: 'Aca', category: 'Acabamento' },
+  ];
 
   const fetchData = useCallback(async () => {
     const { data: ords } = await supabase.from('production_orders').select('*, clients(name, company_name)').order('created_at', { ascending: false });
@@ -118,35 +130,25 @@ const Production: React.FC = () => {
     if (!error) { setIsModalOpen(false); fetchData(); setNewOrder({ order_number: '', client_id: '', product_name: '', quantity: 0 }); }
   };
 
-  // --- LÓGICA DE FILTRAGEM ---
+  // --- Lógica de Filtros Rápidos (Pills) ---
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
       order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.product_name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesClient = filterClient === 'Todos' || order.client_id === filterClient;
-    let matchesStatus = true;
-    if (filterStatus !== 'Todos') {
-      if (!order.stages) {
-        matchesStatus = false;
-      } else {
-        matchesStatus = Object.values(order.stages).some((stage: any) => stage.status === filterStatus);
+      order.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (order.clients?.company_name || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+    let matchesTab = true;
+    if (activeTabFilter !== 'Todos') {
+      if (!order.stages) matchesTab = false;
+      else {
+        // Verifica se ALGUMA etapa corresponde ao status do filtro
+        matchesTab = Object.values(order.stages).some((stage: any) => stage.status === activeTabFilter);
       }
     }
-    return matchesSearch && matchesClient && matchesStatus;
+    return matchesSearch && matchesTab;
   });
 
-  const stageColumns = [
-    { key: 'modeling', label: 'Modelagem', category: 'Modelagem' },
-    { key: 'cut', label: 'Corte', category: 'Corte' },
-    { key: 'sew', label: 'Costura', category: 'Costura' },
-    { key: 'embroidery', label: 'Bordado', category: 'Bordado' },
-    { key: 'silk', label: 'Silk', category: 'Estampa Silk' },
-    { key: 'dtf_print', label: 'DTF Print', category: 'Impressão DTF' },
-    { key: 'dtf_press', label: 'DTF Press', category: 'Prensa DTF' },
-    { key: 'finish', label: 'Acabamento', category: 'Acabamento' },
-  ];
-
-  // --- EXPORTAR PARA EXCEL ---
+  // --- Exportação Excel Formatada ---
   const exportToExcel = () => {
     const dataToExport = filteredOrders.map(order => {
       const row: any = {
@@ -155,151 +157,169 @@ const Production: React.FC = () => {
         'Produto': order.product_name,
         'Qtd': order.quantity,
       };
-
       stageColumns.forEach(stage => {
         const sData = order.stages?.[stage.key as keyof typeof order.stages];
-        row[`${stage.label} - Forn.`] = sData?.provider || '-';
         row[`${stage.label} - Status`] = sData?.status || 'Pendente';
+        row[`${stage.label} - Forn.`] = sData?.provider || '-';
         row[`${stage.label} - Data`] = sData?.date_out || '-';
       });
-
       return row;
     });
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    
+    // Ajuste de largura das colunas
+    const wscols = [
+      { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 5 }, // Info basica
+      ...stageColumns.flatMap(() => [{ wch: 12 }, { wch: 15 }, { wch: 12 }]) // Colunas de etapas
+    ];
+    worksheet['!cols'] = wscols;
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Produção");
     XLSX.writeFile(workbook, "Relatorio_Producao_SowBrand.xlsx");
   };
 
-  // --- IMPRIMIR PDF ---
-  const handlePrint = () => {
-    window.print();
+  const toggleRow = (id: string) => {
+    if (expandedOrderId === id) setExpandedOrderId(null);
+    else setExpandedOrderId(id);
+  };
+
+  // Helper para pegar a cor da bolinha de status no resumo
+  const getStatusColor = (status: string | undefined) => {
+    if (status === 'OK') return 'bg-green-500';
+    if (status === 'Atras.') return 'bg-red-500';
+    if (status === 'Andam.') return 'bg-blue-500';
+    return 'bg-gray-300';
   };
 
   return (
     <div className="space-y-6">
-      {/* Estilos de Impressão: Esconde Sidebar e força layout */}
+      {/* CSS Específico para Impressão (Resolve o PDF cortado) */}
       <style>{`
         @media print {
-          @page { size: landscape; margin: 10mm; }
+          @page { size: landscape; margin: 5mm; }
           body * { visibility: hidden; }
-          #production-table-container, #production-table-container * { visibility: visible; }
-          #production-table-container { position: absolute; left: 0; top: 0; width: 100%; }
+          #production-print-area, #production-print-area * { visibility: visible; }
+          #production-print-area { position: absolute; left: 0; top: 0; width: 100%; }
           .no-print { display: none !important; }
-          /* Força cores de fundo na impressão */
-          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          /* Transforma o accordion em blocos visíveis para o PDF */
+          .print-block { display: block !important; page-break-inside: avoid; border: 1px solid #ddd; margin-bottom: 10px; padding: 10px; border-radius: 8px; }
+          .print-hidden { display: none !important; }
         }
       `}</style>
 
-      {/* Header e Ações (Escondidos na impressão) */}
+      {/* Header e Ações */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
         <div className="relative w-full md:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input 
             className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg outline-none focus:border-sow-green" 
-            placeholder="Buscar por pedido..." 
+            placeholder="Buscar por cliente, pedido..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         
         <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
-          <button onClick={() => setShowFilters(!showFilters)} className={`px-3 py-2 border rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap ${showFilters ? 'bg-gray-100' : 'hover:bg-gray-50'}`}>
-            <Filter size={16}/> <span className="hidden sm:inline">Filtros</span>
-          </button>
-          
-          <button onClick={exportToExcel} className="px-3 py-2 border border-green-200 text-green-700 bg-green-50 rounded-lg flex items-center gap-2 hover:bg-green-100 whitespace-nowrap" title="Baixar Excel">
+          <button onClick={exportToExcel} className="px-3 py-2 border border-green-200 text-green-700 bg-green-50 rounded-lg flex items-center gap-2 hover:bg-green-100 whitespace-nowrap">
             <Download size={16}/> <span className="hidden sm:inline">Excel</span>
           </button>
-
-          <button onClick={handlePrint} className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg flex items-center gap-2 hover:bg-gray-50 whitespace-nowrap" title="Imprimir PDF">
+          <button onClick={() => window.print()} className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg flex items-center gap-2 hover:bg-gray-50 whitespace-nowrap">
             <Printer size={16}/> <span className="hidden sm:inline">PDF</span>
           </button>
-          
           <button onClick={() => setIsModalOpen(true)} className="bg-sow-green text-sow-dark px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:brightness-90 whitespace-nowrap">
             <Plus size={18}/> Novo
           </button>
         </div>
       </div>
 
-      {/* Painel de Filtros (Escondido na impressão) */}
-      {showFilters && (
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4 no-print">
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Cliente</label>
-            <select className="w-full p-2 border rounded text-sm bg-white" value={filterClient} onChange={(e) => setFilterClient(e.target.value)}>
-              <option value="Todos">Todos</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.company_name || c.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Status</label>
-            <select className="w-full p-2 border rounded text-sm bg-white" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-              <option value="Todos">Todos</option>
-              <option value="Atras.">🚨 Atrasados</option>
-              <option value="Pendente">⏳ Pendentes</option>
-              <option value="Andam.">🔵 Em Andamento</option>
-              <option value="OK">✅ OK</option>
-            </select>
-          </div>
-          <div className="flex items-end">
-            <button onClick={() => { setFilterClient('Todos'); setFilterStatus('Todos'); setSearchTerm(''); }} className="px-4 py-2 text-red-500 text-sm font-bold hover:bg-red-50 rounded-lg flex items-center gap-2">
-              <X size={16}/> Limpar
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Filtros Rápidos (Pills) */}
+      <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar no-print">
+        {[
+          { label: 'Todos', val: 'Todos', icon: Filter },
+          { label: 'Atrasados', val: 'Atras.', icon: AlertCircle, color: 'bg-red-100 text-red-700 border-red-200' },
+          { label: 'Em Andamento', val: 'Andam.', icon: Clock, color: 'bg-blue-100 text-blue-700 border-blue-200' },
+          { label: 'Concluídos', val: 'OK', icon: CheckCircle, color: 'bg-green-100 text-green-700 border-green-200' },
+        ].map(filter => (
+          <button
+            key={filter.val}
+            onClick={() => setActiveTabFilter(filter.val)}
+            className={`px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 border transition-all whitespace-nowrap ${
+              activeTabFilter === filter.val 
+                ? 'bg-sow-dark text-white border-sow-dark' 
+                : filter.color || 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            {filter.icon && <filter.icon size={14} />}
+            {filter.label}
+          </button>
+        ))}
+      </div>
 
-      {/* Container da Tabela (Área de Impressão) */}
-      <div id="production-table-container" className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-        {/* Header visível apenas na impressão */}
-        <div className="hidden print:flex justify-between items-center p-4 border-b border-gray-300 mb-4">
-            <h1 className="text-2xl font-bold text-gray-800">Relatório de Produção</h1>
-            <p className="text-sm text-gray-500">{new Date().toLocaleDateString()}</p>
-        </div>
+      {/* Lista Inteligente (Accordion) */}
+      <div id="production-print-area" className="space-y-3">
+        {filteredOrders.length === 0 && <div className="text-center text-gray-500 py-10">Nenhum pedido encontrado.</div>}
+        
+        {filteredOrders.map((order) => {
+          const isExpanded = expandedOrderId === order.id;
+          
+          return (
+            <div key={order.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden print-block">
+              {/* Cabeçalho do Card (Visão Resumida) */}
+              <div 
+                onClick={() => toggleRow(order.id)}
+                className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                {/* Info Principal */}
+                <div className="flex items-center gap-4 w-full md:w-1/3">
+                  <div className={`p-2 rounded-lg font-bold text-sm bg-gray-100 text-sow-dark border border-gray-200`}>
+                    {order.order_number}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-sm">{order.product_name}</h3>
+                    <p className="text-xs text-gray-500">{order.clients?.company_name || 'Cliente S/ Nome'}</p>
+                  </div>
+                </div>
 
-        <div className="overflow-x-auto custom-scrollbar pb-32 print:pb-0 print:overflow-visible">
-          <table className="w-full text-left border-collapse print:text-[8px]">
-            <thead>
-              <tr className="bg-gray-50 text-xs font-bold text-gray-500 uppercase leading-normal print:bg-gray-100">
-                <th className="p-3 min-w-[180px] border-b border-r z-10 sticky left-0 bg-gray-50 print:static" rowSpan={2}>Pedido / Cliente</th>
-                <th className="p-3 min-w-[140px] border-b border-r" rowSpan={2}>Produto</th>
-                <th className="p-3 text-center border-b border-r" rowSpan={2}>Qtd</th>
-                
-                {stageColumns.map(stage => (
-                  <th key={stage.key} className="p-2 border-b border-r text-center min-w-[360px] print:min-w-0" colSpan={4}>{stage.label}</th>
-                ))}
-              </tr>
-              <tr className="bg-gray-50 text-[10px] font-bold text-gray-500 uppercase leading-normal print:bg-gray-100">
-                {stageColumns.map((_, i) => (
-                  <React.Fragment key={i}>
-                    <th className="p-2 border-b border-r text-center w-[150px] print:w-auto">Fornecedor</th>
-                    <th className="p-2 border-b border-r text-center w-[85px] print:w-auto">Ent.</th>
-                    <th className="p-2 border-b border-r text-center w-[85px] print:w-auto">Sai.</th>
-                    <th className="p-2 border-b border-r text-center w-[80px] print:w-auto">Status</th>
-                  </React.Fragment>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 text-sm print:text-[9px]">
-              {filteredOrders.length === 0 ? (
-                <tr><td colSpan={20} className="p-8 text-center text-gray-500">Nenhum pedido encontrado.</td></tr>
-              ) : (
-                filteredOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-gray-50 transition-colors print:break-inside-avoid">
-                    <td className="p-3 border-r sticky left-0 bg-white z-10 group-hover:bg-gray-50 print:static print:border-gray-300">
-                      <div className="font-bold text-sow-dark">{order.order_number}</div>
-                      <div className="text-xs text-gray-500 truncate print:whitespace-normal">{order.clients?.company_name || order.clients?.name}</div>
-                    </td>
-                    <td className="p-3 border-r text-gray-700 font-medium truncate max-w-[140px] print:border-gray-300 print:whitespace-normal" title={order.product_name}>{order.product_name}</td>
-                    <td className="p-3 border-r text-center font-bold print:border-gray-300">{order.quantity}</td>
-                    
+                {/* Status Visual (Bolinhas) - Escondido ao imprimir se quiser só o detalhe, mas deixei visível */}
+                <div className="flex items-center gap-1 overflow-x-auto w-full md:w-auto no-print">
+                  {stageColumns.map(stage => {
+                    const status = order.stages?.[stage.key as keyof typeof order.stages]?.status;
+                    return (
+                      <div key={stage.key} className="flex flex-col items-center gap-1 min-w-[30px]">
+                        <div className={`w-3 h-3 rounded-full ${getStatusColor(status)}`} title={`${stage.label}: ${status || 'Pendente'}`}></div>
+                        <span className="text-[9px] text-gray-400 font-mono uppercase">{stage.short}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Quantidade e Seta */}
+                <div className="flex items-center gap-6 md:justify-end w-full md:w-auto">
+                  <div className="text-right">
+                    <span className="text-xs text-gray-400 uppercase font-bold block">Qtd</span>
+                    <span className="font-bold text-lg">{order.quantity}</span>
+                  </div>
+                  <div className="no-print">
+                    {isExpanded ? <ChevronUp size={20} className="text-gray-400"/> : <ChevronDown size={20} className="text-gray-400"/>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Área de Detalhes (Expandida) */}
+              {(isExpanded || true) && ( // O "|| true" é um truque para o CSS de impressão funcionar (veja o estilo .print-block)
+                <div className={`border-t border-gray-100 bg-gray-50 p-4 ${isExpanded ? 'block' : 'hidden print:block'}`}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                     {stageColumns.map(stage => {
                       const stageData = order.stages?.[stage.key as keyof typeof order.stages];
                       return (
-                        <React.Fragment key={stage.key}>
-                          <td className="p-2 border-r print:border-gray-300">
+                        <div key={stage.key} className="bg-white p-3 rounded border border-gray-200 shadow-sm">
+                          <p className="text-[10px] font-bold text-gray-400 uppercase mb-2 border-b border-gray-100 pb-1 flex justify-between items-center">
+                            {stage.label}
+                            {stageData?.status === 'Atras.' && <AlertCircle size={12} className="text-red-500"/>}
+                          </p>
+                          <div className="space-y-2">
                             <EditableSupplierCell 
                               current={stageData?.provider} 
                               category={stage.category}
@@ -307,37 +327,30 @@ const Production: React.FC = () => {
                               suppliers={suppliers}
                               onUpdate={(val) => updateOrderStage(order.id, stage.key, 'provider', val)}
                             />
-                          </td>
-                          <td className="p-2 border-r print:border-gray-300">
-                            <EditableDateCell 
-                              date={stageData?.date_in}
-                              onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_in', val)}
-                            />
-                          </td>
-                          <td className="p-2 border-r print:border-gray-300">
-                            <EditableDateCell 
-                              date={stageData?.date_out}
-                              onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_out', val)}
-                            />
-                          </td>
-                          <td className="p-2 border-r text-center print:border-gray-300">
+                            <div className="flex gap-2">
+                              <EditableDateCell 
+                                date={stageData?.date_in}
+                                onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_in', val)}
+                              />
+                              <EditableDateCell 
+                                date={stageData?.date_out}
+                                onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_out', val)}
+                              />
+                            </div>
                             <EditableStatusCell 
                               status={stageData?.status}
                               onUpdate={(val) => updateOrderStage(order.id, stage.key, 'status', val)}
                             />
-                          </td>
-                        </React.Fragment>
+                          </div>
+                        </div>
                       );
                     })}
-                  </tr>
-                ))
+                  </div>
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
-        <div className="bg-gray-50 p-3 border-t border-gray-200 text-xs text-gray-500 no-print">
-          Mostrando {filteredOrders.length} pedidos
-        </div>
+            </div>
+          );
+        })}
       </div>
 
       {isModalOpen && (
