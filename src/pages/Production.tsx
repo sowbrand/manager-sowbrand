@@ -6,11 +6,11 @@ import { STATUS_OPTIONS } from '../constants';
 import * as XLSX from 'xlsx';
 import { gapi } from 'gapi-script';
 
-// --- CONFIGURAÇÃO DO GOOGLE DRIVE ---
-// ⚠️ CERTIFIQUE-SE QUE SUAS CHAVES ESTÃO AQUI:
-const CLIENT_ID = "839855666704-3mb0lgpmrk2mi4a812d6q2p7rtukem9f.apps.googleusercontent.com"; 
-const API_KEY = "AIzaSyCljCB6lkuZCA-1eNRtwie9k5KwQ8X5IB0"; 
-const SPREADSHEET_ID = "c1nK9T3KK0wGI8sb8uJx_lJ2junAs1U_R-Xyz1KovP4"; 
+// --- CONFIGURAÇÃO SEGURA DO GOOGLE DRIVE ---
+// Agora buscamos as chaves das Variáveis de Ambiente (Segurança Máxima)
+const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ""; 
+const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || ""; 
+const SPREADSHEET_ID = import.meta.env.VITE_GOOGLE_SHEET_ID || ""; 
 
 const SCOPES = "https://www.googleapis.com/auth/spreadsheets"; 
 const DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
@@ -125,6 +125,12 @@ const Production: React.FC = () => {
   // Inicializar Google API
   useEffect(() => {
     const start = () => {
+      // Verifica se as chaves existem antes de tentar iniciar
+      if (!API_KEY || !CLIENT_ID) {
+        setGapiError("Chaves do Google não configuradas no arquivo .env");
+        return;
+      }
+
       gapi.client.init({
         apiKey: API_KEY,
         clientId: CLIENT_ID,
@@ -134,9 +140,9 @@ const Production: React.FC = () => {
         setIsGapiInitialized(true);
         setGapiError(null);
       }).catch((error: any) => {
-        console.error("Erro GAPI:", error);
+        console.error("Erro GAPI Init:", error);
         const msg = error?.error?.message || error?.details || JSON.stringify(error);
-        setGapiError("Erro de Conexão: " + msg);
+        setGapiError("Erro Inicialização Google: " + msg);
       });
     };
     gapi.load('client:auth2', start);
@@ -187,14 +193,16 @@ const Production: React.FC = () => {
     return matchesSearch && matchesTab && matchesClient;
   });
 
-  // --- SINCRONIZAÇÃO GOOGLE DRIVE ---
+  // --- SINCRONIZAÇÃO GOOGLE DRIVE (DIAGNÓSTICO) ---
   const handleSyncDrive = async () => {
-    if (!isGapiInitialized) return alert('Sistema do Google ainda carregando... Tente em instantes.');
+    if (!isGapiInitialized) return alert('Sistema do Google ainda não carregou ou falhou. Veja a mensagem de erro acima do botão.');
     
     setIsSyncing(true);
 
     try {
       const authInstance = gapi.auth2.getAuthInstance();
+      
+      // Verifica se está logado
       if (!authInstance.isSignedIn.get()) {
         await authInstance.signIn();
       }
@@ -224,6 +232,7 @@ const Production: React.FC = () => {
 
       const values = [headers, ...rows];
 
+      // Limpa e Atualiza (Nome da Aba: Página1)
       await gapi.client.sheets.spreadsheets.values.clear({
         spreadsheetId: SPREADSHEET_ID,
         range: 'Página1!A1:Z1000',
@@ -239,8 +248,17 @@ const Production: React.FC = () => {
       alert('✅ Backup Realizado com Sucesso no Google Drive!');
 
     } catch (error: any) {
-      console.error('Erro no Sync:', error);
-      alert('Erro ao sincronizar: ' + (error.result?.error?.message || error.message));
+      console.error('ERRO SYNC:', error);
+      
+      // Diagnóstico de erro detalhado
+      let msg = "Erro desconhecido";
+      if (typeof error === 'string') msg = error;
+      else if (error?.result?.error?.message) msg = error.result.error.message;
+      else if (error?.message) msg = error.message;
+      else if (error?.error) msg = JSON.stringify(error.error); 
+      else msg = JSON.stringify(error);
+
+      alert('❌ Erro no Backup: ' + msg);
     } finally {
       setIsSyncing(false);
     }
@@ -376,7 +394,7 @@ const Production: React.FC = () => {
               </button>
             </div>
             
-            {/* DIAGNÓSTICO DE ERRO NA TELA (Só aparece se o Google falhar) */}
+            {/* DIAGNÓSTICO DE ERRO NA TELA (Aparece se faltar configuração) */}
             {gapiError && <div className="text-[10px] text-red-500 font-bold bg-red-50 px-2 py-1 rounded border border-red-200">{gapiError}</div>}
           </div>
         </div>
