@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Filter, Download, Printer, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Clock } from 'lucide-react'; // REMOVIDO: X
+import { Plus, Search, Filter, Download, Printer, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import type { ProductionOrder, Client, Supplier } from '../types';
 import { STATUS_OPTIONS } from '../constants';
@@ -83,14 +83,14 @@ const Production: React.FC = () => {
   const [newOrder, setNewOrder] = useState({ order_number: '', client_id: '', product_name: '', quantity: 0 });
 
   const stageColumns = [
-    { key: 'modeling', label: 'Modelagem', short: 'Mod', category: 'Modelagem' },
-    { key: 'cut', label: 'Corte', short: 'Cor', category: 'Corte' },
-    { key: 'sew', label: 'Costura', short: 'Cos', category: 'Costura' },
-    { key: 'embroidery', label: 'Bordado', short: 'Bor', category: 'Bordado' },
-    { key: 'silk', label: 'Silk', short: 'Sil', category: 'Estampa Silk' },
-    { key: 'dtf_print', label: 'DTF Print', short: 'Prt', category: 'Impressão DTF' },
-    { key: 'dtf_press', label: 'DTF Press', short: 'Pre', category: 'Prensa DTF' },
-    { key: 'finish', label: 'Acabamento', short: 'Aca', category: 'Acabamento' },
+    { key: 'modeling', label: 'Modelagem', short: 'Modelagem', category: 'Modelagem' },
+    { key: 'cut', label: 'Corte', short: 'Corte', category: 'Corte' },
+    { key: 'sew', label: 'Costura', short: 'Costura', category: 'Costura' },
+    { key: 'embroidery', label: 'Bordado', short: 'Bordado', category: 'Bordado' },
+    { key: 'silk', label: 'Silk', short: 'Silk', category: 'Estampa Silk' },
+    { key: 'dtf_print', label: 'DTF Print', short: 'DTF Print', category: 'Impressão DTF' },
+    { key: 'dtf_press', label: 'DTF Press', short: 'DTF Press', category: 'Prensa DTF' },
+    { key: 'finish', label: 'Acabamento', short: 'Acabamento', category: 'Acabamento' },
   ];
 
   const fetchData = useCallback(async () => {
@@ -166,14 +166,11 @@ const Production: React.FC = () => {
     });
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    
-    // Ajuste de largura das colunas
     const wscols = [
       { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 5 }, 
       ...stageColumns.flatMap(() => [{ wch: 12 }, { wch: 15 }, { wch: 12 }]) 
     ];
     worksheet['!cols'] = wscols;
-
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Produção");
     XLSX.writeFile(workbook, "Relatorio_Producao_SowBrand.xlsx");
@@ -188,7 +185,7 @@ const Production: React.FC = () => {
     if (status === 'OK') return 'bg-green-500';
     if (status === 'Atras.') return 'bg-red-500';
     if (status === 'Andam.') return 'bg-blue-500';
-    return 'bg-gray-300';
+    return 'bg-gray-200';
   };
 
   return (
@@ -199,10 +196,23 @@ const Production: React.FC = () => {
           @page { size: landscape; margin: 5mm; }
           body * { visibility: hidden; }
           #production-print-area, #production-print-area * { visibility: visible; }
-          #production-print-area { position: absolute; left: 0; top: 0; width: 100%; }
+          /* CORREÇÃO DO PDF: Removemos position:absolute e usamos static para permitir múltiplas páginas */
+          #production-print-area { position: static; width: 100%; display: block; overflow: visible; }
           .no-print { display: none !important; }
-          .print-block { display: block !important; page-break-inside: avoid; border: 1px solid #ddd; margin-bottom: 10px; padding: 10px; border-radius: 8px; }
+          /* Força quebra de página correta - cada pedido é um bloco */
+          .print-block { 
+            display: block !important; 
+            break-inside: avoid; 
+            page-break-inside: avoid; 
+            border: 1px solid #ccc; 
+            margin-bottom: 10px; 
+            padding: 5px; 
+            border-radius: 4px;
+            font-size: 10px; /* Reduz fonte para caber mais */
+          }
           .print-hidden { display: none !important; }
+          /* Mostra os detalhes ao imprimir mesmo se estiver fechado na tela */
+          .details-area { display: block !important; } 
         }
       `}</style>
 
@@ -266,36 +276,39 @@ const Production: React.FC = () => {
               {/* Cabeçalho do Card */}
               <div 
                 onClick={() => toggleRow(order.id)}
-                className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                className="p-4 flex flex-col md:flex-row items-center justify-between gap-4 cursor-pointer hover:bg-gray-50 transition-colors"
               >
-                {/* Info Principal */}
-                <div className="flex items-center gap-4 w-full md:w-1/3">
-                  <div className={`p-2 rounded-lg font-bold text-sm bg-gray-100 text-sow-dark border border-gray-200`}>
+                {/* Info Principal (Esquerda Fixa) */}
+                <div className="flex items-center gap-4 w-full md:w-1/4 shrink-0">
+                  <div className={`p-2 rounded-lg font-bold text-sm bg-gray-100 text-sow-dark border border-gray-200 whitespace-nowrap`}>
                     {order.order_number}
                   </div>
-                  <div>
-                    <h3 className="font-bold text-gray-900 text-sm">{order.product_name}</h3>
-                    <p className="text-xs text-gray-500">{order.clients?.company_name || 'Cliente S/ Nome'}</p>
+                  <div className="overflow-hidden">
+                    <h3 className="font-bold text-gray-900 text-sm truncate" title={order.product_name}>{order.product_name}</h3>
+                    <p className="text-xs text-gray-500 truncate" title={order.clients?.company_name}>{order.clients?.company_name || 'Cliente S/ Nome'}</p>
                   </div>
                 </div>
 
-                {/* Status Visual (Bolinhas) */}
-                <div className="flex items-center gap-1 overflow-x-auto w-full md:w-auto no-print">
+                {/* Status Visual (Centro - Expansível) */}
+                {/* CORREÇÃO ITEM 1: flex-1 para ocupar o espaço central, gap-3 para separar, justify-center */}
+                <div className="flex-1 flex items-center justify-center gap-4 overflow-x-auto w-full no-print">
                   {stageColumns.map(stage => {
                     const status = order.stages?.[stage.key as keyof typeof order.stages]?.status;
                     return (
                       <div key={stage.key} className="flex flex-col items-center gap-1 min-w-[30px]">
-                        <div className={`w-3 h-3 rounded-full ${getStatusColor(status)}`} title={`${stage.label}: ${status || 'Pendente'}`}></div>
-                        <span className="text-[9px] text-gray-400 font-mono uppercase">{stage.short}</span>
+                        {/* Bolinha Aumentada 30% (w-4 h-4) */}
+                        <div className={`w-4 h-4 rounded-full ${getStatusColor(status)} shadow-sm`} title={`${stage.label}: ${status || 'Pendente'}`}></div>
+                        {/* Texto Completo (usando short name ajustado) */}
+                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter">{stage.short}</span>
                       </div>
                     );
                   })}
                 </div>
 
-                {/* Quantidade */}
-                <div className="flex items-center gap-6 md:justify-end w-full md:w-auto">
+                {/* Quantidade (Direita Fixa) */}
+                <div className="flex items-center gap-6 md:justify-end w-full md:w-auto shrink-0">
                   <div className="text-right">
-                    <span className="text-xs text-gray-400 uppercase font-bold block">Qtd</span>
+                    <span className="text-[10px] text-gray-400 uppercase font-bold block">Qtd</span>
                     <span className="font-bold text-lg">{order.quantity}</span>
                   </div>
                   <div className="no-print">
@@ -305,46 +318,45 @@ const Production: React.FC = () => {
               </div>
 
               {/* Área de Detalhes (Expandida) */}
-              {(isExpanded || true) && ( 
-                <div className={`border-t border-gray-100 bg-gray-50 p-4 ${isExpanded ? 'block' : 'hidden print:block'}`}>
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                    {stageColumns.map(stage => {
-                      const stageData = order.stages?.[stage.key as keyof typeof order.stages];
-                      return (
-                        <div key={stage.key} className="bg-white p-3 rounded border border-gray-200 shadow-sm">
-                          <p className="text-[10px] font-bold text-gray-400 uppercase mb-2 border-b border-gray-100 pb-1 flex justify-between items-center">
-                            {stage.label}
-                            {stageData?.status === 'Atras.' && <AlertCircle size={12} className="text-red-500"/>}
-                          </p>
-                          <div className="space-y-2">
-                            <EditableSupplierCell 
-                              current={stageData?.provider} 
-                              category={stage.category}
-                              stageKey={stage.key}
-                              suppliers={suppliers}
-                              onUpdate={(val) => updateOrderStage(order.id, stage.key, 'provider', val)}
+              {/* A classe 'details-area' força a exibição no print mesmo se fechado */}
+              <div className={`details-area border-t border-gray-100 bg-gray-50 p-4 ${isExpanded ? 'block' : 'hidden'}`}>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                  {stageColumns.map(stage => {
+                    const stageData = order.stages?.[stage.key as keyof typeof order.stages];
+                    return (
+                      <div key={stage.key} className="bg-white p-3 rounded border border-gray-200 shadow-sm print:shadow-none print:border-gray-300">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-2 border-b border-gray-100 pb-1 flex justify-between items-center">
+                          {stage.label}
+                          {stageData?.status === 'Atras.' && <AlertCircle size={12} className="text-red-500"/>}
+                        </p>
+                        <div className="space-y-2">
+                          <EditableSupplierCell 
+                            current={stageData?.provider} 
+                            category={stage.category}
+                            stageKey={stage.key}
+                            suppliers={suppliers}
+                            onUpdate={(val) => updateOrderStage(order.id, stage.key, 'provider', val)}
+                          />
+                          <div className="flex gap-2">
+                            <EditableDateCell 
+                              date={stageData?.date_in}
+                              onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_in', val)}
                             />
-                            <div className="flex gap-2">
-                              <EditableDateCell 
-                                date={stageData?.date_in}
-                                onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_in', val)}
-                              />
-                              <EditableDateCell 
-                                date={stageData?.date_out}
-                                onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_out', val)}
-                              />
-                            </div>
-                            <EditableStatusCell 
-                              status={stageData?.status}
-                              onUpdate={(val) => updateOrderStage(order.id, stage.key, 'status', val)}
+                            <EditableDateCell 
+                              date={stageData?.date_out}
+                              onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_out', val)}
                             />
                           </div>
+                          <EditableStatusCell 
+                            status={stageData?.status}
+                            onUpdate={(val) => updateOrderStage(order.id, stage.key, 'status', val)}
+                          />
                         </div>
-                      );
-                    })}
-                  </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
             </div>
           );
         })}
