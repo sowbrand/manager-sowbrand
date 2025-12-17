@@ -1,7 +1,7 @@
 export interface ProductionStageData {
   provider?: string;
   date_in?: string;
-  date_out?: string; // Campo novo
+  date_out?: string;
   status: 'Pendente' | 'Andam.' | 'OK' | 'Atras.' | 'Prob.';
 }
 
@@ -9,7 +9,7 @@ export interface ProductionStages {
   modeling?: ProductionStageData;
   cut?: ProductionStageData;
   sew?: ProductionStageData;
-  embroidery?: ProductionStageData; // Bordado
+  embroidery?: ProductionStageData;
   silk?: ProductionStageData;
   dtf_print?: ProductionStageData;
   dtf_press?: ProductionStageData;
@@ -19,7 +19,7 @@ export interface ProductionStages {
 export interface ProductionOrder {
   id: string;
   created_at: string;
-  order_number: number;
+  order_number: string; // AGORA É STRING (Texto)
   client_id: string;
   clients?: { name: string; company_name: string };
   product_name: string;
@@ -46,7 +46,12 @@ export interface Supplier {
   created_at: string;
   name: string;
   category: string;
-  contact_info: string;
+  contact_info: string; // Mantido para compatibilidade
+  phone: string;        // Novo
+  email: string;        // Novo
+  cnpj: string;         // Novo
+  address: string;      // Novo
+  observations: string; // Novo
   status: 'Ativo' | 'Inativo';
 }
 

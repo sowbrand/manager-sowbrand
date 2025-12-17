@@ -7,9 +7,14 @@ const Production: React.FC = () => {
   const [orders, setOrders] = useState<ProductionOrder[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newOrder, setNewOrder] = useState({ client_id: '', product_name: '', quantity: 0, origin_model: 'Sow Brand' });
+  const [newOrder, setNewOrder] = useState({ 
+    order_number: '', // ID Manual
+    client_id: '', 
+    product_name: '', 
+    quantity: 0, 
+    origin_model: 'Sow Brand' 
+  });
 
-  // Função para buscar dados (usada no inicio e após criar)
   const fetchData = async () => {
     const { data: ords } = await supabase.from('production_orders').select('*, clients(name, company_name)').order('created_at', { ascending: false });
     const { data: clis } = await supabase.from('clients').select('*');
@@ -17,16 +22,22 @@ const Production: React.FC = () => {
     if (clis) setClients(clis);
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    await supabase.from('production_orders').insert([newOrder]);
-    setIsModalOpen(false);
-    // Atualiza a lista sem recarregar a página (Evita erro 404)
-    fetchData();
+    if (!newOrder.order_number) return alert('O número do pedido é obrigatório');
+
+    try {
+      const { error } = await supabase.from('production_orders').insert([newOrder]);
+      if (error) throw error;
+      
+      setIsModalOpen(false);
+      setNewOrder({ order_number: '', client_id: '', product_name: '', quantity: 0, origin_model: 'Sow Brand' });
+      fetchData();
+    } catch (error: any) {
+      alert('Erro ao criar pedido: ' + error.message);
+    }
   };
 
   const StatusBadge = ({ status }: { status?: string }) => {
@@ -50,16 +61,11 @@ const Production: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg outline-none focus:border-sow-green" placeholder="Buscar por pedido, cliente..." />
+          <input className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg outline-none focus:border-sow-green" placeholder="Buscar por pedido..." />
         </div>
-        <div className="flex gap-2 w-full md:w-auto">
-           <button className="flex-1 md:flex-none px-4 py-2 border border-gray-300 text-gray-700 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50">
-             <Filter size={18} /> Filtros
-           </button>
-           <button onClick={() => setIsModalOpen(true)} className="flex-1 md:flex-none px-4 py-2 bg-sow-green text-sow-dark font-bold rounded-lg flex items-center justify-center gap-2 hover:brightness-90 transition-all">
-             <Plus size={18} /> Novo Pedido
-           </button>
-        </div>
+        <button onClick={() => setIsModalOpen(true)} className="bg-sow-green text-sow-dark px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:brightness-90 transition-all">
+           <Plus size={18} /> Novo Pedido
+        </button>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
@@ -90,7 +96,7 @@ const Production: React.FC = () => {
               {orders.map((order) => (
                 <tr key={order.id} className="hover:bg-gray-50">
                   <td className="p-4">
-                    <div className="font-bold text-sow-dark">#{order.order_number.toString().padStart(3, '0')}</div>
+                    <div className="font-bold text-sow-dark">{order.order_number}</div>
                     <div className="text-xs text-gray-500">{order.clients?.company_name || order.clients?.name}</div>
                   </td>
                   <td className="p-4 text-gray-700 font-medium">{order.product_name}</td>
@@ -100,7 +106,6 @@ const Production: React.FC = () => {
                       {order.origin_model}
                     </span>
                   </td>
-                  
                   <StageColumns data={order.stages?.modeling} />
                   <StageColumns data={order.stages?.cut} />
                   <StageColumns data={order.stages?.sew} />
@@ -114,22 +119,40 @@ const Production: React.FC = () => {
             </tbody>
           </table>
         </div>
-        <div className="bg-gray-50 p-3 border-t border-gray-200 text-xs text-gray-500 flex justify-between items-center">
-          <span>Mostrando {orders.length} pedidos</span>
-        </div>
       </div>
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <form onSubmit={handleCreate} className="bg-white p-6 rounded-lg w-full max-w-md space-y-4 shadow-xl">
              <h3 className="font-bold text-lg">Novo Pedido</h3>
-             <select className="w-full p-2 border rounded" onChange={e => setNewOrder({...newOrder, client_id: e.target.value})}>
-                <option value="">Selecione o Cliente...</option>
-                {clients.map(c => <option key={c.id} value={c.id}>{c.company_name}</option>)}
-             </select>
-             <input placeholder="Produto" className="w-full p-2 border rounded" onChange={e => setNewOrder({...newOrder, product_name: e.target.value})} />
-             <input placeholder="Qtd" type="number" className="w-full p-2 border rounded" onChange={e => setNewOrder({...newOrder, quantity: Number(e.target.value)})} />
-             <div className="flex gap-2">
+             
+             <div>
+                <label className="text-xs font-bold text-gray-500">Número do Pedido (ID Manual)</label>
+                <input required placeholder="Ex: PROP-1020" className="w-full p-2 border rounded mt-1" 
+                  value={newOrder.order_number} onChange={e => setNewOrder({...newOrder, order_number: e.target.value})} />
+             </div>
+
+             <div>
+                <label className="text-xs font-bold text-gray-500">Cliente</label>
+                <select className="w-full p-2 border rounded mt-1" onChange={e => setNewOrder({...newOrder, client_id: e.target.value})}>
+                    <option value="">Selecione...</option>
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.company_name || c.name}</option>)}
+                </select>
+             </div>
+
+             <div>
+                <label className="text-xs font-bold text-gray-500">Produto</label>
+                <input className="w-full p-2 border rounded mt-1" placeholder="Ex: Camiseta" 
+                  onChange={e => setNewOrder({...newOrder, product_name: e.target.value})} />
+             </div>
+
+             <div>
+                <label className="text-xs font-bold text-gray-500">Quantidade</label>
+                <input type="number" className="w-full p-2 border rounded mt-1" 
+                  onChange={e => setNewOrder({...newOrder, quantity: Number(e.target.value)})} />
+             </div>
+
+             <div className="flex gap-2 pt-4">
                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 p-2 border rounded">Cancelar</button>
                <button type="submit" className="flex-1 p-2 bg-sow-green font-bold rounded">Salvar</button>
              </div>

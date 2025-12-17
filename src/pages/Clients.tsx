@@ -7,30 +7,54 @@ const Clients: React.FC = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<Client>>({});
+  const [loading, setLoading] = useState(false);
 
   const fetchClients = async () => {
     const { data } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
     if (data) setClients(data);
   };
 
-  useEffect(() => {
-    fetchClients();
-  }, []);
+  useEffect(() => { fetchClients(); }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { error } = await supabase.from('clients').upsert([formData]);
-    
-    if (error) {
-      alert('Erro ao salvar');
-    } else {
+    setLoading(true);
+
+    try {
+      if (formData.id) {
+        // ATUALIZAR (UPDATE)
+        const { error } = await supabase.from('clients').update({
+          name: formData.name,
+          company_name: formData.company_name,
+          email: formData.email,
+          phone: formData.phone,
+          observations: formData.observations
+        }).eq('id', formData.id);
+        if (error) throw error;
+      } else {
+        // CRIAR NOVO (INSERT)
+        const { error } = await supabase.from('clients').insert([{
+          name: formData.name || 'Sem nome', // Garante que não vai vazio
+          company_name: formData.company_name,
+          email: formData.email,
+          phone: formData.phone,
+          observations: formData.observations,
+          status: 'Ativo'
+        }]);
+        if (error) throw error;
+      }
+
       setIsModalOpen(false);
-      fetchClients(); 
-      setFormData({}); 
+      fetchClients();
+      setFormData({});
+    } catch (error: any) {
+      console.error('Erro:', error);
+      alert('Erro ao salvar: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Função para abrir modal de edição
   const handleEdit = (client: Client) => {
     setFormData(client);
     setIsModalOpen(true);
@@ -100,28 +124,49 @@ const Clients: React.FC = () => {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg w-full max-w-md space-y-4">
+          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg w-full max-w-md space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
              <h3 className="font-bold text-lg">{formData.id ? 'Editar Cliente' : 'Novo Cliente'}</h3>
              
-             <input required placeholder="Nome / Marca" className="w-full p-2 border rounded" 
-                    value={formData.company_name || ''} 
-                    onChange={e => setFormData({...formData, company_name: e.target.value})} />
+             <div>
+               <label className="text-xs font-bold text-gray-500">Nome / Marca *</label>
+               <input required className="w-full p-2 border rounded mt-1" 
+                      value={formData.company_name || ''} 
+                      onChange={e => setFormData({...formData, company_name: e.target.value})} />
+             </div>
              
-             <input placeholder="Email" className="w-full p-2 border rounded" 
-                    value={formData.email || ''} 
-                    onChange={e => setFormData({...formData, email: e.target.value})} />
+             <div>
+               <label className="text-xs font-bold text-gray-500">Nome Contato</label>
+               <input className="w-full p-2 border rounded mt-1" 
+                      value={formData.name || ''} 
+                      onChange={e => setFormData({...formData, name: e.target.value})} />
+             </div>
+
+             <div>
+               <label className="text-xs font-bold text-gray-500">Email</label>
+               <input className="w-full p-2 border rounded mt-1" 
+                      value={formData.email || ''} 
+                      onChange={e => setFormData({...formData, email: e.target.value})} />
+             </div>
              
-             <input placeholder="Telefone" className="w-full p-2 border rounded" 
-                    value={formData.phone || ''} 
-                    onChange={e => setFormData({...formData, phone: e.target.value})} />
+             <div>
+               <label className="text-xs font-bold text-gray-500">Telefone</label>
+               <input className="w-full p-2 border rounded mt-1" 
+                      value={formData.phone || ''} 
+                      onChange={e => setFormData({...formData, phone: e.target.value})} />
+             </div>
              
-             <textarea placeholder="Observações" className="w-full p-2 border rounded" 
-                    value={formData.observations || ''} 
-                    onChange={e => setFormData({...formData, observations: e.target.value})} />
+             <div>
+               <label className="text-xs font-bold text-gray-500">Observações</label>
+               <textarea className="w-full p-2 border rounded mt-1 h-24" 
+                      value={formData.observations || ''} 
+                      onChange={e => setFormData({...formData, observations: e.target.value})} />
+             </div>
              
-             <div className="flex gap-2">
-               <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 p-2 border rounded">Cancelar</button>
-               <button type="submit" className="flex-1 p-2 bg-sow-green font-bold rounded">Salvar</button>
+             <div className="flex gap-2 pt-2">
+               <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 p-2 border rounded hover:bg-gray-50">Cancelar</button>
+               <button type="submit" disabled={loading} className="flex-1 p-2 bg-sow-green font-bold rounded hover:bg-green-600 text-sow-dark">
+                 {loading ? 'Salvando...' : 'Salvar'}
+               </button>
              </div>
           </form>
         </div>
