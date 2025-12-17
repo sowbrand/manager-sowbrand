@@ -5,10 +5,10 @@ import type { ProductionOrder, Client, Supplier } from '../types';
 import { STATUS_OPTIONS } from '../constants';
 import * as XLSX from 'xlsx';
 
-// --- Componentes de Edição ---
+// --- COMPONENTES DE CÉLULA EDITÁVEL ---
 
 const EditableStatusCell = ({ status, onUpdate }: { status: string | undefined, onUpdate: (val: string) => void }) => {
-  // Encontra a opção baseada no valor salvo, mas mostra o LABEL completo (ex: "Atrasado")
+  // Busca a opção completa para exibir corretamente
   const currentStatus = STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0];
   return (
     <select 
@@ -47,6 +47,7 @@ const EditableSupplierCell = ({
     .filter(s => s.category === category)
     .map(s => ({ id: s.id, name: s.name }));
 
+  // Regras de negócio: Modelagem e DTF Press aceitam opções internas
   if (stageKey === 'modeling') {
     options = [{ id: 'interno', name: 'Interno' }, { id: 'cliente', name: 'Cliente' }, ...options];
   } else if (stageKey === 'dtf_press') {
@@ -68,24 +69,28 @@ const EditableSupplierCell = ({
   );
 };
 
-// --- Componente Principal ---
+// --- COMPONENTE PRINCIPAL ---
 
 const Production: React.FC = () => {
+  // Estados de Dados
   const [orders, setOrders] = useState<ProductionOrder[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   
+  // Estados de Interface
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   
-  // Filtros
+  // Estados de Filtro
   const [showFilters, setShowFilters] = useState(false); 
   const [activeTabFilter, setActiveTabFilter] = useState('Todos'); 
   const [filterClient, setFilterClient] = useState('Todos'); 
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Estado de Novo Pedido
   const [newOrder, setNewOrder] = useState({ order_number: '', client_id: '', product_name: '', quantity: 0 });
 
+  // Definição das Colunas com nomes COMPLETOS
   const stageColumns = [
     { key: 'modeling', label: 'Modelagem', category: 'Modelagem' },
     { key: 'cut', label: 'Corte', category: 'Corte' },
@@ -97,6 +102,7 @@ const Production: React.FC = () => {
     { key: 'finish', label: 'Acabamento', category: 'Acabamento' },
   ];
 
+  // Carregar Dados
   const fetchData = useCallback(async () => {
     const { data: ords } = await supabase.from('production_orders').select('*, clients(name, company_name)').order('created_at', { ascending: false });
     const { data: clis } = await supabase.from('clients').select('*');
@@ -108,6 +114,7 @@ const Production: React.FC = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Atualizar Estágio
   const updateOrderStage = async (orderId: string, stageName: string, field: string, value: string) => {
     const orderIndex = orders.findIndex(o => o.id === orderId);
     if (orderIndex === -1) return;
@@ -127,6 +134,7 @@ const Production: React.FC = () => {
     await supabase.from('production_orders').update({ stages: updatedStages }).eq('id', orderId);
   };
 
+  // Criar Pedido
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newOrder.order_number) return alert('ID obrigatório');
@@ -134,13 +142,15 @@ const Production: React.FC = () => {
     if (!error) { setIsModalOpen(false); fetchData(); setNewOrder({ order_number: '', client_id: '', product_name: '', quantity: 0 }); }
   };
 
-  // --- Lógica de Filtragem ---
+  // --- LÓGICA DE FILTRAGEM ---
   const filteredOrders = orders.filter(order => {
+    // 1. Busca Texto
     const matchesSearch = 
       order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (order.clients?.company_name || '').toLowerCase().includes(searchTerm.toLowerCase());
 
+    // 2. Filtro de Tab (Status Geral)
     let matchesTab = true;
     if (activeTabFilter !== 'Todos') {
       if (!order.stages) matchesTab = false;
@@ -149,12 +159,44 @@ const Production: React.FC = () => {
       }
     }
 
+    // 3. Filtro de Cliente
     const matchesClient = filterClient === 'Todos' || order.client_id === filterClient;
 
     return matchesSearch && matchesTab && matchesClient;
   });
 
-  // --- Exportação Excel ---
+  // --- HELPERS VISUAIS ---
+
+  // Cor da bolinha
+  const getStatusColor = (status: string | undefined) => {
+    if (status === 'OK') return 'bg-green-500';
+    if (status === 'Atras.') return 'bg-red-500';
+    if (status === 'Andam.') return 'bg-blue-500';
+    return 'bg-gray-200';
+  };
+
+  // Texto completo do status (Ex: "Atras." -> "Atrasado")
+  const getFullStatusLabel = (status: string | undefined) => {
+    const option = STATUS_OPTIONS.find(s => s.value === status);
+    return option ? option.label : (status || 'Pendente');
+  };
+
+  // Formatar Data
+  const formatDateBR = (dateStr: string | undefined) => {
+    if (!dateStr) return '-';
+    const [, m, d] = dateStr.split('-');
+    return `${d}/${m}`;
+  }
+
+  // Classe CSS do texto de status no relatório
+  const getStatusTextClass = (status: string | undefined) => {
+    if (status === 'OK') return 'text-green-700 bg-green-50 border-green-200';
+    if (status === 'Atras.') return 'text-red-700 bg-red-50 border-red-200';
+    if (status === 'Andam.') return 'text-blue-700 bg-blue-50 border-blue-200';
+    return 'text-gray-500 bg-gray-50 border-gray-200';
+  }
+
+  // --- EXPORTAÇÃO EXCEL ---
   const exportToExcel = () => {
     const dataToExport = filteredOrders.map(order => {
       const row: any = {
@@ -165,9 +207,8 @@ const Production: React.FC = () => {
       };
       stageColumns.forEach(stage => {
         const sData = order.stages?.[stage.key as keyof typeof order.stages];
-        // Busca o Label completo para o Excel também
-        const statusLabel = STATUS_OPTIONS.find(s => s.value === sData?.status)?.label || 'Pendente';
-        row[`${stage.label} - Status`] = statusLabel;
+        // Usa o label completo no Excel
+        row[`${stage.label} - Status`] = getFullStatusLabel(sData?.status);
         row[`${stage.label} - Forn.`] = sData?.provider || '-';
         row[`${stage.label} - Data`] = sData?.date_out || '-';
       });
@@ -182,7 +223,7 @@ const Production: React.FC = () => {
     XLSX.writeFile(workbook, "Relatorio_Producao_SowBrand.xlsx");
   };
 
-  // --- Lógica de Impressão ---
+  // --- IMPRESSÃO PDF ---
   const handlePrint = () => {
     const originalTitle = document.title;
     let fileName = 'Relatorio_Producao_Geral';
@@ -203,52 +244,81 @@ const Production: React.FC = () => {
     else setExpandedOrderId(id);
   };
 
-  const getStatusColor = (status: string | undefined) => {
-    if (status === 'OK') return 'bg-green-500';
-    if (status === 'Atras.') return 'bg-red-500';
-    if (status === 'Andam.') return 'bg-blue-500';
-    return 'bg-gray-200';
-  };
-
-  // Helper para buscar o texto completo (ex: "Atras." -> "Atrasado")
-  const getFullStatusLabel = (status: string | undefined) => {
-    const option = STATUS_OPTIONS.find(s => s.value === status);
-    return option ? option.label : (status || 'Pendente');
-  };
-
-  const formatDateBR = (dateStr: string | undefined) => {
-    if (!dateStr) return '-';
-    const [, m, d] = dateStr.split('-');
-    return `${d}/${m}`;
-  }
-
-  const getStatusTextClass = (status: string | undefined) => {
-    if (status === 'OK') return 'text-green-700 bg-green-50 border-green-200';
-    if (status === 'Atras.') return 'text-red-700 bg-red-50 border-red-200';
-    if (status === 'Andam.') return 'text-blue-700 bg-blue-50 border-blue-200';
-    return 'text-gray-500 bg-gray-50 border-gray-200';
-  }
-
   return (
     <div className="space-y-6">
+      {/* CSS DE IMPRESSÃO (RETRATO/VERTICAL) */}
       <style>{`
         @media print {
           @page { size: portrait; margin: 10mm; }
           body { background: white; -webkit-print-color-adjust: exact; }
+          
+          /* Esconde interface de gestão */
           .ui-only, nav, header, aside, button, input { display: none !important; }
-          #print-report-container { display: block !important; width: 100%; position: absolute; top: 0; left: 0; }
-          .report-header { border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end; }
-          .report-grid { display: grid; grid-template-columns: 1fr; gap: 20px; } 
-          .report-card { border: 1px solid #ccc; border-radius: 8px; padding: 15px; page-break-inside: avoid; background: #fff; box-shadow: none; }
-          .report-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
-          .report-stages-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-          .report-stage-box { border: 1px solid #f0f0f0; padding: 8px 12px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
+          
+          /* Mostra relatório */
+          #print-report-container { 
+            display: block !important; 
+            width: 100%; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+          }
+          
+          .report-header { 
+            border-bottom: 2px solid #000; 
+            padding-bottom: 15px; 
+            margin-bottom: 25px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: flex-end; 
+          }
+          
+          /* Grid de Pedidos (Um embaixo do outro) */
+          .report-grid { 
+            display: grid; 
+            grid-template-columns: 1fr; 
+            gap: 20px; 
+          } 
+          
+          .report-card { 
+            border: 1px solid #ccc; 
+            border-radius: 8px; 
+            padding: 15px; 
+            page-break-inside: avoid; 
+            background: #fff; 
+            box-shadow: none;
+          }
+          
+          .report-card-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            margin-bottom: 12px; 
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee; 
+          }
+          
+          /* Grid de Etapas no Relatório (2 colunas para caber texto completo) */
+          .report-stages-grid { 
+            display: grid; 
+            grid-template-columns: repeat(2, 1fr); 
+            gap: 10px; 
+          }
+          
+          .report-stage-box { 
+            border: 1px solid #f0f0f0; 
+            padding: 8px 12px; 
+            border-radius: 6px; 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
         }
       `}</style>
 
-      {/* --- ÁREA DE TRABALHO (UI) --- */}
+      {/* --- ÁREA DE TRABALHO (UI GESTOR) --- */}
       <div className="ui-only">
-        {/* Linha Superior */}
+        {/* Header e Botões */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
           <div className="relative w-full md:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -260,139 +330,4 @@ const Production: React.FC = () => {
             />
           </div>
           
-          <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
-            <button onClick={() => setShowFilters(!showFilters)} className={`px-3 py-2 border rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap ${showFilters ? 'bg-gray-100' : 'hover:bg-gray-50'}`}>
-              <Filter size={16}/> <span className="hidden sm:inline">Filtros</span>
-            </button>
-
-            <button onClick={exportToExcel} className="px-3 py-2 border border-green-200 text-green-700 bg-green-50 rounded-lg flex items-center gap-2 hover:bg-green-100 whitespace-nowrap">
-              <Download size={16}/> <span className="hidden sm:inline">Excel</span>
-            </button>
-            <button onClick={handlePrint} className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg flex items-center gap-2 hover:bg-gray-50 whitespace-nowrap">
-              <Printer size={16}/> <span className="hidden sm:inline">PDF</span>
-            </button>
-            <button onClick={() => setIsModalOpen(true)} className="bg-sow-green text-sow-dark px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:brightness-90 whitespace-nowrap">
-              <Plus size={18}/> Novo
-            </button>
-          </div>
-        </div>
-
-        {/* Painel Filtros */}
-        {showFilters && (
-          <div className="bg-white p-4 mb-4 rounded-lg border border-gray-200 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Filtrar por Cliente</label>
-              <select className="w-full p-2 border rounded text-sm bg-white" value={filterClient} onChange={(e) => setFilterClient(e.target.value)}>
-                <option value="Todos">Todos os Clientes (Geral)</option>
-                {clients.map(c => <option key={c.id} value={c.id}>{c.company_name || c.name}</option>)}
-              </select>
-            </div>
-            <div className="flex items-end">
-              <button onClick={() => { setFilterClient('Todos'); setActiveTabFilter('Todos'); setSearchTerm(''); }} className="px-4 py-2 text-red-500 text-sm font-bold hover:bg-red-50 rounded-lg flex items-center gap-2">
-                <X size={16}/> Limpar Filtros
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Filtros Rápidos */}
-        <div className="flex gap-2 overflow-x-auto pb-4 custom-scrollbar">
-          {[
-            { label: 'Todos', val: 'Todos', icon: Filter },
-            { label: 'Atrasados', val: 'Atras.', icon: AlertCircle, color: 'bg-red-100 text-red-700 border-red-200' },
-            { label: 'Em Andamento', val: 'Andam.', icon: Clock, color: 'bg-blue-100 text-blue-700 border-blue-200' },
-            { label: 'Concluídos', val: 'OK', icon: CheckCircle, color: 'bg-green-100 text-green-700 border-green-200' },
-          ].map(filter => (
-            <button key={filter.val} onClick={() => setActiveTabFilter(filter.val)}
-              className={`px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 border transition-all whitespace-nowrap ${
-                activeTabFilter === filter.val ? 'bg-sow-dark text-white border-sow-dark' : filter.color || 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {filter.icon && <filter.icon size={14} />} {filter.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Lista Accordion (Visão do Gestor) */}
-        <div className="space-y-3">
-          {filteredOrders.length === 0 && <div className="text-center text-gray-500 py-10 bg-gray-50 rounded border border-dashed">Nenhum pedido encontrado.</div>}
-
-          {filteredOrders.map((order) => {
-            const isExpanded = expandedOrderId === order.id;
-            return (
-              <div key={order.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                <div onClick={() => toggleRow(order.id)} className="p-4 flex flex-col md:flex-row items-center justify-between gap-4 cursor-pointer hover:bg-gray-50 transition-colors">
-                  
-                  {/* Esquerda: Info */}
-                  <div className="flex items-center gap-4 w-full md:w-1/4 shrink-0">
-                    <div className={`p-2 rounded-lg font-bold text-sm bg-gray-100 text-sow-dark border border-gray-200 whitespace-nowrap`}>{order.order_number}</div>
-                    <div className="overflow-hidden">
-                      <h3 className="font-bold text-gray-900 text-sm truncate">{order.product_name}</h3>
-                      <p className="text-xs text-gray-500 truncate">{order.clients?.company_name || 'Cliente S/ Nome'}</p>
-                    </div>
-                  </div>
-
-                  {/* Centro: Bolinhas */}
-                  <div className="flex-1 flex items-center justify-center gap-6 overflow-x-auto w-full px-4">
-                    {stageColumns.map(stage => {
-                      const status = order.stages?.[stage.key as keyof typeof order.stages]?.status;
-                      return (
-                        <div key={stage.key} className="flex flex-col items-center gap-2 min-w-[50px]">
-                          <div className={`w-4 h-4 rounded-full ${getStatusColor(status)} shadow-sm`} title={`${stage.label}: ${getFullStatusLabel(status)}`}></div>
-                          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-tight text-center">{stage.label}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Direita: Qtd */}
-                  <div className="flex items-center gap-6 md:justify-end w-full md:w-auto shrink-0">
-                    <div className="text-right">
-                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Qtd</span>
-                      <span className="font-bold text-lg">{order.quantity}</span>
-                    </div>
-                    <div>{isExpanded ? <ChevronUp size={20} className="text-gray-400"/> : <ChevronDown size={20} className="text-gray-400"/>}</div>
-                  </div>
-                </div>
-
-                {isExpanded && (
-                  <div className="border-t border-gray-100 bg-gray-50 p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                      {stageColumns.map(stage => {
-                        const stageData = order.stages?.[stage.key as keyof typeof order.stages];
-                        return (
-                          <div key={stage.key} className="bg-white p-3 rounded border border-gray-200 shadow-sm">
-                            <p className="text-[10px] font-bold text-gray-400 uppercase mb-2 border-b border-gray-100 pb-1 flex justify-between items-center">
-                              {stage.label}
-                              {stageData?.status === 'Atras.' && <AlertCircle size={12} className="text-red-500"/>}
-                            </p>
-                            <div className="space-y-2">
-                              <EditableSupplierCell current={stageData?.provider} category={stage.category} stageKey={stage.key} suppliers={suppliers} onUpdate={(val) => updateOrderStage(order.id, stage.key, 'provider', val)} />
-                              <div className="flex gap-2">
-                                <EditableDateCell date={stageData?.date_in} onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_in', val)} />
-                                <EditableDateCell date={stageData?.date_out} onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_out', val)} />
-                              </div>
-                              <EditableStatusCell status={stageData?.status} onUpdate={(val) => updateOrderStage(order.id, stage.key, 'status', val)} />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* --- ÁREA DE RELATÓRIO PDF --- */}
-      <div id="print-report-container" className="hidden">
-        <div className="report-header">
-          <div>
-            <h1 className="text-2xl font-bold uppercase tracking-wide text-sow-dark">
-              Relatório de Produção
-            </h1>
-            <p className="text-sm text-gray-500 font-bold">{filterClient !== 'Todos' ? clients.find(c => c.id === filterClient)?.company_name : 'Geral'}</p>
-          </div>
-          <div className="text-right"></div>
+          <div className="flex gap-2 w-full md:w-auto overflow-x-auto"></div>
