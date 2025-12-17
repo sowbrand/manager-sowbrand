@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'lucide-react'; // Imports falsos apenas para manter estrutura se necessario, mas vamos usar os icones reais abaixo
 import { 
   LayoutDashboard, 
   ShoppingBag, 
@@ -8,7 +7,6 @@ import {
   LogOut, 
   Menu, 
   X, 
-  Shirt, 
   Truck 
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
@@ -22,42 +20,42 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [settings, setSettings] = useState<CompanySettings>(DEFAULT_COMPANY_SETTINGS);
-  
-  // Hooks de navegação simulados para este exemplo (já que usamos window.location no App.tsx simples)
-  // No seu código real, mantenha a lógica de roteamento que já existia.
-  // Vou simplificar mantendo a estrutura visual.
-
-  const location = window.location.pathname;
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
   useEffect(() => {
+    // Busca configurações
     const fetchSettings = async () => {
       const { data } = await supabase.from('company_settings').select('*').single();
       if (data) setSettings(data);
     };
     fetchSettings();
+
+    // Ouve mudanças na URL para atualizar o menu ativo
+    const handleLocationChange = () => setCurrentPath(window.location.pathname);
+    window.addEventListener('popstate', handleLocationChange);
+    return () => window.removeEventListener('popstate', handleLocationChange);
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('sow_auth');
-    window.location.reload();
+    window.location.href = '/';
+  };
+
+  const navigate = (path: string) => {
+    window.history.pushState({}, '', path);
+    // Dispara evento para o App.tsx saber que mudou
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    setCurrentPath(path);
+    setIsSidebarOpen(false);
   };
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/production', label: 'Gestão de Produção', icon: ShoppingBag },
     { path: '/clients', label: 'Clientes', icon: Users },
-    { path: '/suppliers', label: 'Fornecedores', icon: Truck }, // Trocado Shirt por Truck para variar
+    { path: '/suppliers', label: 'Fornecedores', icon: Truck },
     { path: '/settings', label: 'Configurações', icon: Settings },
   ];
-
-  // Função auxiliar para navegação simples
-  const navigate = (path: string) => {
-    window.history.pushState({}, '', path);
-    // Força atualização simples (em um app React Router seria diferente)
-    const navEvent = new PopStateEvent('popstate');
-    window.dispatchEvent(navEvent);
-    setIsSidebarOpen(false);
-  };
 
   return (
     <div className="flex h-screen w-full bg-gray-50">
@@ -92,12 +90,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               key={item.path}
               onClick={() => navigate(item.path)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
-                location === item.path 
+                currentPath === item.path 
                   ? 'bg-sow-green text-white shadow-lg shadow-green-900/20' 
                   : 'text-gray-400 hover:bg-white/5 hover:text-white'
               }`}
             >
-              <item.icon size={20} className={location === item.path ? 'text-white' : 'text-gray-500 group-hover:text-white'} />
+              <item.icon size={20} className={currentPath === item.path ? 'text-white' : 'text-gray-500 group-hover:text-white'} />
               <span className="font-medium">{item.label}</span>
             </button>
           ))}
@@ -121,22 +119,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Main Content */}
       <main className="flex-1 h-full overflow-hidden flex flex-col relative w-full">
-        {/* Header Mobile Overlay */}
         {isSidebarOpen && (
           <div 
             className="fixed inset-0 bg-black/50 z-40 md:hidden"
             onClick={() => setIsSidebarOpen(false)}
           />
         )}
-
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-end md:justify-between px-4 md:px-8 shadow-sm shrink-0 z-20">
-          <div className="hidden md:block">
-            <h1 className="text-lg font-bold text-sow-black capitalize">
-              {location === '/' ? 'Dashboard' : location.replace('/', '').replace('-', ' ')}
-            </h1>
-          </div>
+        
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-end px-8 shadow-sm shrink-0 z-20">
           <div className="flex items-center gap-4">
-            <div className="flex flex-col items-end mr-2">
+             <div className="flex flex-col items-end mr-2">
               <span className="text-sm font-bold text-sow-black">Admin</span>
               <span className="text-xs text-gray-500">{settings.company_name}</span>
             </div>
@@ -146,7 +138,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 custom-scrollbar bg-gray-50/50">
+        <div className="flex-1 overflow-y-auto p-8 bg-gray-50">
           <div className="max-w-7xl mx-auto">
             {children}
           </div>

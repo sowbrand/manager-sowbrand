@@ -6,72 +6,54 @@ import Suppliers from './pages/Suppliers';
 import Production from './pages/Production';
 import Login from './pages/Login';
 import Settings from './pages/Settings';
-import type { CompanySettings } from './types';
-import { DEFAULT_COMPANY_SETTINGS } from './constants';
 
 const App: React.FC = () => {
-  // Authentication State with Persistence
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('sow_auth') === 'true';
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
-  // Settings State with Persistence
-  const [companySettings, setCompanySettings] = useState<CompanySettings>(
-    () => {
-      const saved = localStorage.getItem('sow_settings');
-      return saved ? JSON.parse(saved) : DEFAULT_COMPANY_SETTINGS;
-    }
-  );
+  useEffect(() => {
+    // Verifica login
+    const auth = localStorage.getItem('sow_auth') === 'true';
+    setIsAuthenticated(auth);
 
-  const [currentView, setCurrentView] = useState('dashboard');
+    // Sistema de navegação simples
+    const handleLocationChange = () => {
+      setCurrentPath(window.location.pathname);
+    };
 
-  const handleLogin = () => {
-    setIsAuthenticated(true);
-    localStorage.setItem('sow_auth', 'true');
-  };
-
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    localStorage.removeItem('sow_auth');
-    setCurrentView('dashboard');
-  };
-
-  const handleSaveSettings = (newSettings: CompanySettings) => {
-    setCompanySettings(newSettings);
-    localStorage.setItem('sow_settings', JSON.stringify(newSettings));
-  };
-
-  const renderContent = () => {
-    switch (currentView) {
-      case 'dashboard':
-        return <Dashboard />;
-      case 'clients':
-        return <Clients />;
-      case 'suppliers':
-        return <Suppliers />;
-      case 'production':
-        return <Production />;
-      case 'settings':
-        return (
-          <Settings settings={companySettings} onSave={handleSaveSettings} />
-        );
-      default:
-        return <Dashboard />;
-    }
-  };
+    window.addEventListener('popstate', handleLocationChange);
+    return () => window.removeEventListener('popstate', handleLocationChange);
+  }, []);
 
   if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
+    return <Login onLogin={() => setIsAuthenticated(true)} />;
+  }
+
+  // Roteador simples
+  let content;
+  switch (currentPath) {
+    case '/':
+      content = <Dashboard />;
+      break;
+    case '/clients':
+      content = <Clients />;
+      break;
+    case '/suppliers':
+      content = <Suppliers />;
+      break;
+    case '/production':
+      content = <Production />;
+      break;
+    case '/settings':
+      content = <Settings />;
+      break;
+    default:
+      content = <Dashboard />;
   }
 
   return (
-    <Layout
-      activeTab={currentView}
-      onNavigate={setCurrentView}
-      onLogout={handleLogout}
-      companySettings={companySettings}
-    >
-      {renderContent()}
+    <Layout>
+      {content}
     </Layout>
   );
 };

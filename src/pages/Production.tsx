@@ -9,8 +9,8 @@ const Production: React.FC = () => {
 
   const fetchOrders = async () => {
     setLoading(true);
-    // Aqui fazemos um "join" para trazer o nome do cliente junto com o pedido
-    const { data, error } = await supabase
+    // REMOVIDO o "error" daqui, pois não estava sendo usado
+    const { data } = await supabase
       .from('production_orders')
       .select('*, clients(name)')
       .order('created_at', { ascending: false });
