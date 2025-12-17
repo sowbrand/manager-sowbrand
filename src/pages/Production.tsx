@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Filter, Download, Printer, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Clock, X } from 'lucide-react';
+import { Plus, Search, Filter, Download, Printer, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Clock, X, Droplet } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import type { ProductionOrder, Client, Supplier } from '../types';
 import { STATUS_OPTIONS } from '../constants';
@@ -85,10 +85,12 @@ const Production: React.FC = () => {
 
   const [newOrder, setNewOrder] = useState({ order_number: '', client_id: '', product_name: '', quantity: 0 });
 
+  // Definição das Colunas com TINTURARIA
   const stageColumns = [
     { key: 'modeling', label: 'Modelagem', category: 'Modelagem' },
     { key: 'cut', label: 'Corte', category: 'Corte' },
     { key: 'sew', label: 'Costura', category: 'Costura' },
+    { key: 'dyeing', label: 'Tinturaria', category: 'Tinturaria' }, // NOVA ETAPA
     { key: 'embroidery', label: 'Bordado', category: 'Bordado' },
     { key: 'silk', label: 'Silk', category: 'Estampa Silk' },
     { key: 'dtf_print', label: 'DTF Print', category: 'Impressão DTF' },
@@ -205,6 +207,7 @@ const Production: React.FC = () => {
     if (status === 'OK') return 'bg-green-500';
     if (status === 'Atras.') return 'bg-red-500';
     if (status === 'Andam.') return 'bg-blue-500';
+    if (status === 'N/A') return 'bg-gray-100 border border-gray-300'; // Cor neutra para N/A
     return 'bg-gray-200';
   };
 
@@ -223,6 +226,7 @@ const Production: React.FC = () => {
     if (status === 'OK') return 'text-green-700 bg-green-50 border-green-200';
     if (status === 'Atras.') return 'text-red-700 bg-red-50 border-red-200';
     if (status === 'Andam.') return 'text-blue-700 bg-blue-50 border-blue-200';
+    if (status === 'N/A') return 'text-gray-400 bg-gray-50 border-gray-200';
     return 'text-gray-500 bg-gray-50 border-gray-200';
   }
 
@@ -243,7 +247,7 @@ const Production: React.FC = () => {
         }
       `}</style>
 
-      {/* --- ÁREA DE TRABALHO (UI) --- */}
+      {/* --- ÁREA DE TRABALHO (UI GESTOR) --- */}
       <div className="ui-only">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
@@ -331,8 +335,9 @@ const Production: React.FC = () => {
                   <div className="flex-1 flex items-center justify-center gap-6 overflow-x-auto w-full px-4">
                     {stageColumns.map(stage => {
                       const status = order.stages?.[stage.key as keyof typeof order.stages]?.status;
+                      // Não mostra bolinha se for N/A na visão resumida (fica cinza clarinho ou invisível se preferir)
                       return (
-                        <div key={stage.key} className="flex flex-col items-center gap-2 min-w-[50px]">
+                        <div key={stage.key} className={`flex flex-col items-center gap-2 min-w-[50px] ${status === 'N/A' ? 'opacity-30' : ''}`}>
                           <div className={`w-4 h-4 rounded-full ${getStatusColor(status)} shadow-sm`} title={`${stage.label}: ${getFullStatusLabel(status)}`}></div>
                           <span className="text-[10px] text-gray-500 font-bold uppercase tracking-tight text-center">{stage.label}</span>
                         </div>
@@ -351,7 +356,7 @@ const Production: React.FC = () => {
 
                 {isExpanded && (
                   <div className="border-t border-gray-100 bg-gray-50 p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                       {stageColumns.map(stage => {
                         const stageData = order.stages?.[stage.key as keyof typeof order.stages];
                         return (
@@ -417,6 +422,9 @@ const Production: React.FC = () => {
                   const sData = order.stages?.[stage.key as keyof typeof order.stages];
                   const status = sData?.status || 'Pendente';
                   const fullStatus = getFullStatusLabel(status);
+
+                  // A MÁGICA DO ITEM 3: SE FOR N/A, NÃO RENDERIZA NADA
+                  if (status === 'N/A') return null;
 
                   return (
                     <div key={stage.key} className="report-stage-box">

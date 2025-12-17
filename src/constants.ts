@@ -1,6 +1,6 @@
 import { 
   Shirt, Scissors, PenTool, Palette, Printer, Package,
-  Factory, Stamp, Layers
+  Factory, Stamp, Layers, Droplet // Novo ícone
 } from 'lucide-react';
 
 export const DEFAULT_COMPANY_SETTINGS = {
@@ -18,6 +18,7 @@ export const SUPPLIER_CONFIG: Record<string, { icon: any, color: string }> = {
   'Modelagem':       { icon: PenTool,   color: 'bg-purple-100 text-purple-800 border-purple-200' },
   'Corte':           { icon: Scissors,  color: 'bg-red-100 text-red-800 border-red-200' },
   'Costura':         { icon: Shirt,     color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  'Tinturaria':      { icon: Droplet,   color: 'bg-pink-100 text-pink-800 border-pink-200' }, // NOVA
   'Bordado':         { icon: Stamp,     color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
   'Estampa Silk':    { icon: Palette,   color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
   'Impressão DTF':   { icon: Printer,   color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
@@ -26,10 +27,10 @@ export const SUPPLIER_CONFIG: Record<string, { icon: any, color: string }> = {
   'Outros':          { icon: Factory,   color: 'bg-gray-100 text-gray-800 border-gray-200' }
 };
 
-// CORREÇÃO: Labels agora são palavras completas para aparecer bonito na tela
 export const STATUS_OPTIONS = [
   { value: 'Pendente', label: 'Pendente',   color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
   { value: 'Andam.',    label: 'Andamento',  color: 'bg-blue-100 text-blue-800 border-blue-300' },
   { value: 'OK',        label: 'Concluído',  color: 'bg-green-100 text-green-800 border-green-300' },
   { value: 'Atras.',    label: 'Atrasado',   color: 'bg-red-100 text-red-800 border-red-300' },
+  { value: 'N/A',       label: 'Não se Aplica', color: 'bg-gray-50 text-gray-400 border-gray-200' }, // NOVO STATUS
 ];

@@ -2,13 +2,14 @@ export interface ProductionStageData {
   provider?: string;
   date_in?: string;
   date_out?: string;
-  status: 'Pendente' | 'Andam.' | 'OK' | 'Atras.' | 'Prob.';
+  status: 'Pendente' | 'Andam.' | 'OK' | 'Atras.' | 'Prob.' | 'N/A'; // Adicionado N/A
 }
 
 export interface ProductionStages {
   modeling?: ProductionStageData;
   cut?: ProductionStageData;
   sew?: ProductionStageData;
+  dyeing?: ProductionStageData; // NOVA ETAPA: Tinturaria
   embroidery?: ProductionStageData;
   silk?: ProductionStageData;
   dtf_print?: ProductionStageData;
@@ -19,12 +20,12 @@ export interface ProductionStages {
 export interface ProductionOrder {
   id: string;
   created_at: string;
-  order_number: string; // AGORA É STRING (Texto)
+  order_number: string;
   client_id: string;
   clients?: { name: string; company_name: string };
   product_name: string;
   quantity: number;
-  origin_model: string;
+  origin_model?: string; // Mantido opcional por compatibilidade
   status: string;
   deadline: string;
   stages: ProductionStages;
@@ -46,12 +47,12 @@ export interface Supplier {
   created_at: string;
   name: string;
   category: string;
-  contact_info: string; // Mantido para compatibilidade
-  phone: string;        // Novo
-  email: string;        // Novo
-  cnpj: string;         // Novo
-  address: string;      // Novo
-  observations: string; // Novo
+  contact_info: string;
+  phone: string;
+  email: string;
+  cnpj: string;
+  address: string;
+  observations: string;
   status: 'Ativo' | 'Inativo';
 }
 
