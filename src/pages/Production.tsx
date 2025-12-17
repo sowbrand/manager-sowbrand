@@ -7,12 +7,11 @@ import * as XLSX from 'xlsx';
 import { gapi } from 'gapi-script';
 
 // --- CONFIGURAÇÃO DO GOOGLE DRIVE ---
-// ⚠️ COLE SUAS CHAVES AQUI DENTRO DAS ASPAS:
+// ⚠️ CERTIFIQUE-SE QUE SUAS CHAVES ESTÃO AQUI:
 const CLIENT_ID = "839855666704-3mb0lgpmrk2mi4a812d6q2p7rtukem9f.apps.googleusercontent.com"; 
 const API_KEY = "CAIzaSyCljCB6lkuZCA-1eNRtwie9k5KwQ8X5IB0"; 
-const SPREADSHEET_ID = "1c1nK9T3KK0wGI8sb8uJx_lJ2junAs1U_R-Xyz1KovP4"; 
+const SPREADSHEET_ID = "c1nK9T3KK0wGI8sb8uJx_lJ2junAs1U_R-Xyz1KovP4"; 
 
-// Não mexer aqui (Configurações internas do Google)
 const SCOPES = "https://www.googleapis.com/auth/spreadsheets"; 
 const DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
 
@@ -85,7 +84,6 @@ const Production: React.FC = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   
   // Filtros
@@ -94,11 +92,12 @@ const Production: React.FC = () => {
   const [filterClient, setFilterClient] = useState('Todos'); 
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Estados de Sincronização Google
+  const [newOrder, setNewOrder] = useState({ order_number: '', client_id: '', product_name: '', quantity: 0 });
+
+  // Estados Google
   const [isGapiInitialized, setIsGapiInitialized] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-
-  const [newOrder, setNewOrder] = useState({ order_number: '', client_id: '', product_name: '', quantity: 0 });
+  const [gapiError, setGapiError] = useState<string | null>(null);
 
   const stageColumns = [
     { key: 'modeling', label: 'Modelagem', category: 'Modelagem' },
@@ -133,8 +132,11 @@ const Production: React.FC = () => {
         scope: SCOPES,
       }).then(() => {
         setIsGapiInitialized(true);
+        setGapiError(null);
       }).catch((error: any) => {
-        console.error("Erro ao inicializar Google API:", error);
+        console.error("Erro GAPI:", error);
+        const msg = error?.error?.message || error?.details || JSON.stringify(error);
+        setGapiError("Erro de Conexão: " + msg);
       });
     };
     gapi.load('client:auth2', start);
@@ -192,16 +194,14 @@ const Production: React.FC = () => {
     setIsSyncing(true);
 
     try {
-      // 1. Verifica Login
       const authInstance = gapi.auth2.getAuthInstance();
       if (!authInstance.isSignedIn.get()) {
         await authInstance.signIn();
       }
 
-      // 2. Prepara os Dados
       const headers = [
         'Pedido', 'Cliente', 'Produto', 'Qtd',
-        ...stageColumns.flatMap(s => [`${s.label} - Status`, `${s.label} - Data`]) // Simplificado para Backup
+        ...stageColumns.flatMap(s => [`${s.label} - Status`, `${s.label} - Data`])
       ];
 
       const rows = filteredOrders.map(order => {
@@ -224,13 +224,11 @@ const Production: React.FC = () => {
 
       const values = [headers, ...rows];
 
-      // 3. Limpa a Planilha (Range A1:Z1000)
       await gapi.client.sheets.spreadsheets.values.clear({
         spreadsheetId: SPREADSHEET_ID,
         range: 'Página1!A1:Z1000',
       });
 
-      // 4. Escreve os Novos Dados
       await gapi.client.sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
         range: 'Página1!A1',
@@ -339,6 +337,7 @@ const Production: React.FC = () => {
 
       {/* --- ÁREA DE TRABALHO (UI GESTOR) --- */}
       <div className="ui-only">
+        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
           <div className="relative w-full md:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -350,30 +349,35 @@ const Production: React.FC = () => {
             />
           </div>
           
-          <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
-            <button onClick={() => setShowFilters(!showFilters)} className={`px-3 py-2 border rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap ${showFilters ? 'bg-gray-100' : 'hover:bg-gray-50'}`}>
-              <Filter size={16}/> <span className="hidden sm:inline">Filtros</span>
-            </button>
+          <div className="flex flex-col gap-1 items-end">
+            <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
+              <button onClick={() => setShowFilters(!showFilters)} className={`px-3 py-2 border rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap ${showFilters ? 'bg-gray-100' : 'hover:bg-gray-50'}`}>
+                <Filter size={16}/> <span className="hidden sm:inline">Filtros</span>
+              </button>
 
-            {/* BOTÃO SYNC DRIVE */}
-            <button 
-              onClick={handleSyncDrive} 
-              disabled={isSyncing || !isGapiInitialized}
-              className={`px-3 py-2 border border-blue-200 text-blue-700 bg-blue-50 rounded-lg flex items-center gap-2 hover:bg-blue-100 whitespace-nowrap ${isSyncing ? 'opacity-70 cursor-wait' : ''}`}
-            >
-              {isSyncing ? <Loader2 size={16} className="animate-spin"/> : <Cloud size={16}/>} 
-              <span className="hidden sm:inline">{isSyncing ? 'Enviando...' : 'Drive Backup'}</span>
-            </button>
+              {/* BOTÃO SYNC DRIVE (CORRIGIDO CURSOR) */}
+              <button 
+                onClick={handleSyncDrive} 
+                disabled={isSyncing || !isGapiInitialized}
+                className={`px-3 py-2 border border-blue-200 text-blue-700 bg-blue-50 rounded-lg flex items-center gap-2 hover:bg-blue-100 whitespace-nowrap transition-all ${isSyncing ? 'opacity-70 cursor-wait' : (!isGapiInitialized ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer')}`}
+              >
+                {isSyncing ? <Loader2 size={16} className="animate-spin"/> : <Cloud size={16}/>} 
+                <span className="hidden sm:inline">{isSyncing ? 'Enviando...' : 'Drive Backup'}</span>
+              </button>
 
-            <button onClick={exportToExcel} className="px-3 py-2 border border-green-200 text-green-700 bg-green-50 rounded-lg flex items-center gap-2 hover:bg-green-100 whitespace-nowrap">
-              <Download size={16}/> <span className="hidden sm:inline">Excel</span>
-            </button>
-            <button onClick={handlePrint} className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg flex items-center gap-2 hover:bg-gray-50 whitespace-nowrap">
-              <Printer size={16}/> <span className="hidden sm:inline">PDF</span>
-            </button>
-            <button onClick={() => setIsModalOpen(true)} className="bg-sow-green text-sow-dark px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:brightness-90 whitespace-nowrap">
-              <Plus size={18}/> Novo
-            </button>
+              <button onClick={exportToExcel} className="px-3 py-2 border border-green-200 text-green-700 bg-green-50 rounded-lg flex items-center gap-2 hover:bg-green-100 whitespace-nowrap">
+                <Download size={16}/> <span className="hidden sm:inline">Excel</span>
+              </button>
+              <button onClick={handlePrint} className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg flex items-center gap-2 hover:bg-gray-50 whitespace-nowrap">
+                <Printer size={16}/> <span className="hidden sm:inline">PDF</span>
+              </button>
+              <button onClick={() => setIsModalOpen(true)} className="bg-sow-green text-sow-dark px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:brightness-90 whitespace-nowrap">
+                <Plus size={18}/> Novo
+              </button>
+            </div>
+            
+            {/* DIAGNÓSTICO DE ERRO NA TELA (Só aparece se o Google falhar) */}
+            {gapiError && <div className="text-[10px] text-red-500 font-bold bg-red-50 px-2 py-1 rounded border border-red-200">{gapiError}</div>}
           </div>
         </div>
 
