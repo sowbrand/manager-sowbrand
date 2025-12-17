@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Filter, Download, Printer, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Clock, X, Droplet } from 'lucide-react';
+import { Plus, Search, Filter, Download, Printer, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Clock, X } from 'lucide-react'; // REMOVIDO: Droplet
 import { supabase } from '../supabaseClient';
 import type { ProductionOrder, Client, Supplier } from '../types';
 import { STATUS_OPTIONS } from '../constants';
 import * as XLSX from 'xlsx';
 
-// --- COMPONENTES DE CÉLULA EDITÁVEL ---
+// --- Componentes de Edição ---
 
 const EditableStatusCell = ({ status, onUpdate }: { status: string | undefined, onUpdate: (val: string) => void }) => {
   const currentStatus = STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0];
@@ -67,7 +67,7 @@ const EditableSupplierCell = ({
   );
 };
 
-// --- COMPONENTE PRINCIPAL ---
+// --- Componente Principal ---
 
 const Production: React.FC = () => {
   const [orders, setOrders] = useState<ProductionOrder[]>([]);
@@ -85,12 +85,12 @@ const Production: React.FC = () => {
 
   const [newOrder, setNewOrder] = useState({ order_number: '', client_id: '', product_name: '', quantity: 0 });
 
-  // Definição das Colunas com TINTURARIA
+  // Definição das Colunas (INCLUINDO TINTURARIA)
   const stageColumns = [
     { key: 'modeling', label: 'Modelagem', category: 'Modelagem' },
     { key: 'cut', label: 'Corte', category: 'Corte' },
     { key: 'sew', label: 'Costura', category: 'Costura' },
-    { key: 'dyeing', label: 'Tinturaria', category: 'Tinturaria' }, // NOVA ETAPA
+    { key: 'dyeing', label: 'Tinturaria', category: 'Tinturaria' },
     { key: 'embroidery', label: 'Bordado', category: 'Bordado' },
     { key: 'silk', label: 'Silk', category: 'Estampa Silk' },
     { key: 'dtf_print', label: 'DTF Print', category: 'Impressão DTF' },
@@ -207,7 +207,7 @@ const Production: React.FC = () => {
     if (status === 'OK') return 'bg-green-500';
     if (status === 'Atras.') return 'bg-red-500';
     if (status === 'Andam.') return 'bg-blue-500';
-    if (status === 'N/A') return 'bg-gray-100 border border-gray-300'; // Cor neutra para N/A
+    if (status === 'N/A') return 'bg-gray-100 border border-gray-300';
     return 'bg-gray-200';
   };
 
@@ -335,9 +335,11 @@ const Production: React.FC = () => {
                   <div className="flex-1 flex items-center justify-center gap-6 overflow-x-auto w-full px-4">
                     {stageColumns.map(stage => {
                       const status = order.stages?.[stage.key as keyof typeof order.stages]?.status;
-                      // Não mostra bolinha se for N/A na visão resumida (fica cinza clarinho ou invisível se preferir)
+                      // Esconde bolinha se for N/A na visão resumida
+                      if (status === 'N/A') return null;
+                      
                       return (
-                        <div key={stage.key} className={`flex flex-col items-center gap-2 min-w-[50px] ${status === 'N/A' ? 'opacity-30' : ''}`}>
+                        <div key={stage.key} className="flex flex-col items-center gap-2 min-w-[50px]">
                           <div className={`w-4 h-4 rounded-full ${getStatusColor(status)} shadow-sm`} title={`${stage.label}: ${getFullStatusLabel(status)}`}></div>
                           <span className="text-[10px] text-gray-500 font-bold uppercase tracking-tight text-center">{stage.label}</span>
                         </div>
@@ -356,7 +358,7 @@ const Production: React.FC = () => {
 
                 {isExpanded && (
                   <div className="border-t border-gray-100 bg-gray-50 p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                       {stageColumns.map(stage => {
                         const stageData = order.stages?.[stage.key as keyof typeof order.stages];
                         return (
@@ -423,7 +425,7 @@ const Production: React.FC = () => {
                   const status = sData?.status || 'Pendente';
                   const fullStatus = getFullStatusLabel(status);
 
-                  // A MÁGICA DO ITEM 3: SE FOR N/A, NÃO RENDERIZA NADA
+                  // SE FOR N/A, REMOVE DO RELATÓRIO
                   if (status === 'N/A') return null;
 
                   return (
