@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Filter, Download, Printer, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Plus, Search, Filter, Download, Printer, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Clock, X } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import type { ProductionOrder, Client, Supplier } from '../types';
 import { STATUS_OPTIONS } from '../constants';
 import * as XLSX from 'xlsx';
 
-// --- Componentes de Edição (Tela do Gestor) ---
+// --- Componentes de Edição ---
 
 const EditableStatusCell = ({ status, onUpdate }: { status: string | undefined, onUpdate: (val: string) => void }) => {
   const currentStatus = STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0];
@@ -76,7 +76,11 @@ const Production: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
-  const [activeTabFilter, setActiveTabFilter] = useState('Todos'); 
+  
+  // Filtros
+  const [showFilters, setShowFilters] = useState(false); // Painel de filtros avançado
+  const [activeTabFilter, setActiveTabFilter] = useState('Todos'); // Pills de status
+  const [filterClient, setFilterClient] = useState('Todos'); // Dropdown de cliente
   const [searchTerm, setSearchTerm] = useState('');
 
   const [newOrder, setNewOrder] = useState({ order_number: '', client_id: '', product_name: '', quantity: 0 });
@@ -129,24 +133,28 @@ const Production: React.FC = () => {
     if (!error) { setIsModalOpen(false); fetchData(); setNewOrder({ order_number: '', client_id: '', product_name: '', quantity: 0 }); }
   };
 
-  // Lógica de Filtros
+  // --- Lógica de Filtragem ---
   const filteredOrders = orders.filter(order => {
+    // 1. Busca Texto
     const matchesSearch = 
       order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (order.clients?.company_name || '').toLowerCase().includes(searchTerm.toLowerCase());
 
+    // 2. Filtro de Tab (Status Geral)
     let matchesTab = true;
     if (activeTabFilter !== 'Todos') {
       if (!order.stages) matchesTab = false;
-      else {
-        matchesTab = Object.values(order.stages).some((stage: any) => stage.status === activeTabFilter);
-      }
+      else matchesTab = Object.values(order.stages).some((stage: any) => stage.status === activeTabFilter);
     }
-    return matchesSearch && matchesTab;
+
+    // 3. Filtro de Cliente (Novo)
+    const matchesClient = filterClient === 'Todos' || order.client_id === filterClient;
+
+    return matchesSearch && matchesTab && matchesClient;
   });
 
-  // Exportação Excel
+  // --- Exportação Excel ---
   const exportToExcel = () => {
     const dataToExport = filteredOrders.map(order => {
       const row: any = {
@@ -172,6 +180,24 @@ const Production: React.FC = () => {
     XLSX.writeFile(workbook, "Relatorio_Producao_SowBrand.xlsx");
   };
 
+  // --- Lógica de Impressão com Nome Dinâmico ---
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    let fileName = 'Relatorio_Producao_Geral';
+
+    // Se estiver filtrando por um cliente específico, muda o nome do arquivo
+    if (filterClient !== 'Todos') {
+        const clientName = clients.find(c => c.id === filterClient)?.company_name || 'Cliente';
+        // Remove caracteres especiais para o nome do arquivo
+        const safeName = clientName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        fileName = `Relatorio_Producao_${safeName}`;
+    }
+
+    document.title = fileName; // Muda o título (o navegador usa isso como nome do arquivo PDF)
+    window.print();
+    document.title = originalTitle; // Restaura o título original
+  };
+
   const toggleRow = (id: string) => {
     if (expandedOrderId === id) setExpandedOrderId(null);
     else setExpandedOrderId(id);
@@ -184,10 +210,9 @@ const Production: React.FC = () => {
     return 'bg-gray-200';
   };
 
-  // CORREÇÃO: Removemos a variável 'y' que não estava sendo usada
   const formatDateBR = (dateStr: string | undefined) => {
     if (!dateStr) return '-';
-    const [, m, d] = dateStr.split('-'); // Ignora o primeiro item (ano) usando a vírgula
+    const [, m, d] = dateStr.split('-');
     return `${d}/${m}`;
   }
 
@@ -200,7 +225,6 @@ const Production: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* --- CSS DE IMPRESSÃO --- */}
       <style>{`
         @media print {
           @page { size: landscape; margin: 10mm; }
@@ -218,7 +242,8 @@ const Production: React.FC = () => {
 
       {/* --- ÁREA DE TRABALHO (UI) --- */}
       <div className="ui-only">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+        {/* Linha Superior: Busca e Botões */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
           <div className="relative w-full md:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input 
@@ -230,10 +255,17 @@ const Production: React.FC = () => {
           </div>
           
           <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
+            <button 
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-3 py-2 border rounded-lg flex items-center gap-2 transition-colors whitespace-nowrap ${showFilters ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+            >
+              <Filter size={16}/> <span className="hidden sm:inline">Filtros</span>
+            </button>
+
             <button onClick={exportToExcel} className="px-3 py-2 border border-green-200 text-green-700 bg-green-50 rounded-lg flex items-center gap-2 hover:bg-green-100 whitespace-nowrap">
               <Download size={16}/> <span className="hidden sm:inline">Excel</span>
             </button>
-            <button onClick={() => window.print()} className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg flex items-center gap-2 hover:bg-gray-50 whitespace-nowrap">
+            <button onClick={handlePrint} className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg flex items-center gap-2 hover:bg-gray-50 whitespace-nowrap">
               <Printer size={16}/> <span className="hidden sm:inline">PDF Cliente</span>
             </button>
             <button onClick={() => setIsModalOpen(true)} className="bg-sow-green text-sow-dark px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:brightness-90 whitespace-nowrap">
@@ -242,6 +274,32 @@ const Production: React.FC = () => {
           </div>
         </div>
 
+        {/* Painel de Filtros (Expansível) */}
+        {showFilters && (
+          <div className="bg-white p-4 mb-4 rounded-lg border border-gray-200 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Filtrar por Cliente</label>
+              <select 
+                className="w-full p-2 border rounded text-sm bg-white"
+                value={filterClient}
+                onChange={(e) => setFilterClient(e.target.value)}
+              >
+                <option value="Todos">Todos os Clientes (Geral)</option>
+                {clients.map(c => <option key={c.id} value={c.id}>{c.company_name || c.name}</option>)}
+              </select>
+            </div>
+            <div className="flex items-end">
+              <button 
+                onClick={() => { setFilterClient('Todos'); setActiveTabFilter('Todos'); setSearchTerm(''); }}
+                className="px-4 py-2 text-red-500 text-sm font-bold hover:bg-red-50 rounded-lg flex items-center gap-2"
+              >
+                <X size={16}/> Limpar Filtros
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Filtros Rápidos (Pills) */}
         <div className="flex gap-2 overflow-x-auto pb-4 custom-scrollbar">
           {[
             { label: 'Todos', val: 'Todos', icon: Filter },
@@ -264,7 +322,14 @@ const Production: React.FC = () => {
           ))}
         </div>
 
+        {/* Lista Accordion */}
         <div className="space-y-3">
+          {filteredOrders.length === 0 && (
+            <div className="text-center text-gray-500 py-10 bg-gray-50 rounded border border-dashed">
+              Nenhum pedido encontrado para o cliente/filtro selecionado.
+            </div>
+          )}
+
           {filteredOrders.map((order) => {
             const isExpanded = expandedOrderId === order.id;
             return (
@@ -356,7 +421,10 @@ const Production: React.FC = () => {
       <div id="print-report-container" className="hidden">
         <div className="report-header">
           <div>
-            <h1 className="text-2xl font-bold uppercase tracking-wide">Relatório de Produção</h1>
+            <h1 className="text-2xl font-bold uppercase tracking-wide">
+              {/* Título Dinâmico do Relatório */}
+              Relatório de Produção {filterClient !== 'Todos' ? ` - ${clients.find(c => c.id === filterClient)?.company_name}` : ''}
+            </h1>
             <p className="text-sm text-gray-500">Sow Brand Manager</p>
           </div>
           <div className="text-right">
@@ -408,6 +476,7 @@ const Production: React.FC = () => {
         </div>
       </div>
 
+      {/* Modal Novo Pedido */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 ui-only">
           <form onSubmit={handleCreate} className="bg-white p-6 rounded-lg w-full max-w-md space-y-4 shadow-xl">
