@@ -184,14 +184,13 @@ const Production: React.FC = () => {
     return 'bg-gray-200';
   };
 
-  // Helper para formatar data BR no relatório
+  // CORREÇÃO: Removemos a variável 'y' que não estava sendo usada
   const formatDateBR = (dateStr: string | undefined) => {
     if (!dateStr) return '-';
-    const [y, m, d] = dateStr.split('-');
+    const [, m, d] = dateStr.split('-'); // Ignora o primeiro item (ano) usando a vírgula
     return `${d}/${m}`;
   }
 
-  // Helper para cor do texto no relatório
   const getStatusTextClass = (status: string | undefined) => {
     if (status === 'OK') return 'text-green-700 bg-green-50 border-green-200';
     if (status === 'Atras.') return 'text-red-700 bg-red-50 border-red-200';
@@ -201,19 +200,15 @@ const Production: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* --- CSS DE IMPRESSÃO OTIMIZADO --- */}
+      {/* --- CSS DE IMPRESSÃO --- */}
       <style>{`
         @media print {
           @page { size: landscape; margin: 10mm; }
           body { background: white; -webkit-print-color-adjust: exact; }
-          /* Esconde TUDO da interface normal */
           .ui-only, nav, header, aside, button, input { display: none !important; }
-          /* Mostra APENAS o container de relatório */
           #print-report-container { display: block !important; width: 100%; position: absolute; top: 0; left: 0; }
-          
-          /* Estilo do Relatório Impresso */
           .report-header { border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-          .report-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; } /* 2 Pedidos por linha se couber */
+          .report-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; } 
           .report-card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; page-break-inside: avoid; background: #fff; }
           .report-card-header { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
           .report-stages-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
@@ -223,7 +218,6 @@ const Production: React.FC = () => {
 
       {/* --- ÁREA DE TRABALHO (UI) --- */}
       <div className="ui-only">
-        {/* Header e Ações */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div className="relative w-full md:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -248,7 +242,6 @@ const Production: React.FC = () => {
           </div>
         </div>
 
-        {/* Filtros Rápidos */}
         <div className="flex gap-2 overflow-x-auto pb-4 custom-scrollbar">
           {[
             { label: 'Todos', val: 'Todos', icon: Filter },
@@ -271,7 +264,6 @@ const Production: React.FC = () => {
           ))}
         </div>
 
-        {/* Lista Accordion */}
         <div className="space-y-3">
           {filteredOrders.map((order) => {
             const isExpanded = expandedOrderId === order.id;
@@ -360,7 +352,7 @@ const Production: React.FC = () => {
         </div>
       </div>
 
-      {/* --- ÁREA DE RELATÓRIO PDF (Oculta na Tela, Visível na Impressão) --- */}
+      {/* --- ÁREA DE RELATÓRIO PDF --- */}
       <div id="print-report-container" className="hidden">
         <div className="report-header">
           <div>
@@ -376,7 +368,6 @@ const Production: React.FC = () => {
         <div className="report-grid">
           {filteredOrders.map(order => (
             <div key={order.id} className="report-card">
-              {/* Cabeçalho do Card de Relatório */}
               <div className="report-card-header">
                 <div>
                   <span className="text-xs font-bold bg-black text-white px-2 py-0.5 rounded">{order.order_number}</span>
@@ -389,7 +380,6 @@ const Production: React.FC = () => {
               </div>
               <div className="mb-2 text-xs text-gray-500 font-bold uppercase tracking-wider">{order.clients?.company_name}</div>
 
-              {/* Grid de Etapas para Impressão (SEM FORNECEDOR) */}
               <div className="report-stages-grid">
                 {stageColumns.map(stage => {
                   const sData = order.stages?.[stage.key as keyof typeof order.stages];
@@ -418,7 +408,6 @@ const Production: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal Novo Pedido */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 ui-only">
           <form onSubmit={handleCreate} className="bg-white p-6 rounded-lg w-full max-w-md space-y-4 shadow-xl">
