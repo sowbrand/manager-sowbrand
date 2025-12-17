@@ -32,7 +32,7 @@ const EditableDateCell = ({ date, onUpdate }: { date: string | undefined, onUpda
   />
 );
 
-// CORREÇÃO 1: Lógica de opções refinada por etapa
+// CORREÇÃO AQUI: Tipagem flexível para aceitar tanto fornecedores quanto opções manuais
 const EditableSupplierCell = ({ 
   current, category, stageKey, suppliers, onUpdate 
 }: { 
@@ -43,29 +43,29 @@ const EditableSupplierCell = ({
   onUpdate: (val: string) => void 
 }) => {
   
-  let options = [...suppliers.filter(s => s.category === category)];
+  // 1. Transformamos os fornecedores do banco em objetos simples { id, name }
+  // Isso evita o erro de TypeScript pois agora a lista não exige campos como CNPJ/Telefone
+  let options: { id: string, name: string }[] = suppliers
+    .filter(s => s.category === category)
+    .map(s => ({ id: s.id, name: s.name }));
 
-  // Regras Específicas (Item 1)
+  // 2. Adicionamos as opções manuais conforme a regra da etapa
   if (stageKey === 'modeling') {
-    // Modelagem aceita tudo
     options = [{ id: 'interno', name: 'Interno' }, { id: 'cliente', name: 'Cliente' }, ...options];
   } else if (stageKey === 'dtf_press') {
-    // DTF Press aceita Interno + Fornecedores
     options = [{ id: 'interno', name: 'Interno' }, ...options];
   }
-  // Demais etapas (Costura, Corte, etc) só mostram fornecedores cadastrados
 
   return (
     <select 
       value={current || ''} 
       onChange={(e) => onUpdate(e.target.value)}
-      // CORREÇÃO 2: Removido 'truncate' para tentar mostrar tudo, ajustado font-size
       className="w-full p-1 text-[11px] border border-gray-200 rounded text-gray-700 cursor-pointer focus:border-sow-green focus:outline-none bg-white"
-      title={current} // Tooltip nativo para nomes muito longos
+      title={current}
     >
       <option value="">-</option>
       {options.map(opt => (
-        <option key={opt.id || opt.name} value={opt.name}>{opt.name}</option>
+        <option key={opt.id} value={opt.name}>{opt.name}</option>
       ))}
     </select>
   );
@@ -151,14 +151,12 @@ const Production: React.FC = () => {
                 <th className="p-3 text-center border-b border-r" rowSpan={2}>Qtd</th>
                 <th className="p-3 text-center border-b border-r min-w-[100px]" rowSpan={2}>Origem Mod.</th>
                 {stageColumns.map(stage => (
-                  // CORREÇÃO 2: Aumentei min-w para 360px para caber nomes longos
                   <th key={stage.key} className="p-2 border-b border-r text-center min-w-[360px]" colSpan={4}>{stage.label}</th>
                 ))}
               </tr>
               <tr className="bg-gray-50 text-[10px] font-bold text-gray-500 uppercase leading-normal">
                 {stageColumns.map((_, i) => (
                   <React.Fragment key={i}>
-                    {/* CORREÇÃO 2: Coluna Fornecedor agora tem 150px (antes 110px) */}
                     <th className="p-2 border-b border-r text-center w-[150px]">Fornecedor</th>
                     <th className="p-2 border-b border-r text-center w-[85px]">Ent.</th>
                     <th className="p-2 border-b border-r text-center w-[85px]">Sai.</th>
@@ -190,7 +188,7 @@ const Production: React.FC = () => {
                           <EditableSupplierCell 
                             current={stageData?.provider} 
                             category={stage.category}
-                            stageKey={stage.key} // Passamos a chave para saber qual regra aplicar
+                            stageKey={stage.key}
                             suppliers={suppliers}
                             onUpdate={(val) => updateOrderStage(order.id, stage.key, 'provider', val)}
                           />
