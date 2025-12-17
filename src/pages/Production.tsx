@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Filter } from 'lucide-react';
+import { Plus, Search, Filter, X } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import type { ProductionOrder, Client, Supplier } from '../types';
 import { STATUS_OPTIONS } from '../constants';
+
+// --- Componentes de Célula Editável ---
 
 const EditableStatusCell = ({ status, onUpdate }: { status: string | undefined, onUpdate: (val: string) => void }) => {
   const currentStatus = STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0];
@@ -40,17 +42,13 @@ const EditableSupplierCell = ({
   onUpdate: (val: string) => void 
 }) => {
   
-  // Lista padrão: fornecedores da categoria
   let options: { id: string, name: string }[] = suppliers
     .filter(s => s.category === category)
     .map(s => ({ id: s.id, name: s.name }));
 
-  // REGRAS DE NEGÓCIO (CORREÇÃO ITEM 2)
   if (stageKey === 'modeling') {
-    // Modelagem: APENAS Interno ou Cliente (sem lista de nomes)
-    options = [{ id: 'interno', name: 'Interno' }, { id: 'cliente', name: 'Cliente' }];
+    options = [{ id: 'interno', name: 'Interno' }, { id: 'cliente', name: 'Cliente' }, ...options];
   } else if (stageKey === 'dtf_press') {
-    // DTF Press: Interno + Fornecedores
     options = [{ id: 'interno', name: 'Interno' }, ...options];
   }
 
@@ -74,7 +72,13 @@ const Production: React.FC = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  // Removido origin_model do estado inicial
+  
+  // ESTADOS DE FILTRO
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('Todos');
+  const [filterClient, setFilterClient] = useState('Todos');
+
   const [newOrder, setNewOrder] = useState({ order_number: '', client_id: '', product_name: '', quantity: 0 });
 
   const fetchData = useCallback(async () => {
@@ -114,6 +118,30 @@ const Production: React.FC = () => {
     if (!error) { setIsModalOpen(false); fetchData(); setNewOrder({ order_number: '', client_id: '', product_name: '', quantity: 0 }); }
   };
 
+  // LÓGICA DE FILTRAGEM
+  const filteredOrders = orders.filter(order => {
+    // 1. Busca por texto (ID ou Produto)
+    const matchesSearch = 
+      order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.product_name.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // 2. Filtro de Cliente
+    const matchesClient = filterClient === 'Todos' || order.client_id === filterClient;
+
+    // 3. Filtro de Status (Se algum estágio tiver o status selecionado)
+    let matchesStatus = true;
+    if (filterStatus !== 'Todos') {
+      if (!order.stages) {
+        matchesStatus = false;
+      } else {
+        // Verifica se ALGUMA etapa tem o status selecionado (ex: "Atras.")
+        matchesStatus = Object.values(order.stages).some((stage: any) => stage.status === filterStatus);
+      }
+    }
+
+    return matchesSearch && matchesClient && matchesStatus;
+  });
+
   const stageColumns = [
     { key: 'modeling', label: 'Modelagem', category: 'Modelagem' },
     { key: 'cut', label: 'Corte', category: 'Corte' },
@@ -128,22 +156,82 @@ const Production: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        {/* Barra de Busca */}
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg outline-none focus:border-sow-green" placeholder="Buscar por pedido..." />
+          <input 
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg outline-none focus:border-sow-green" 
+            placeholder="Buscar por pedido ou produto..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
+        
         <div className="flex gap-2">
-          <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg flex items-center gap-2 hover:bg-gray-50"><Filter size={18}/> Filtros</button>
-          <button onClick={() => setIsModalOpen(true)} className="bg-sow-green text-sow-dark px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:brightness-90"><Plus size={18}/> Novo Pedido</button>
+          {/* Botão de Filtros (Toggle) */}
+          <button 
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-4 py-2 border rounded-lg flex items-center gap-2 transition-colors ${showFilters ? 'bg-gray-100 border-gray-300' : 'border-gray-300 hover:bg-gray-50'}`}
+          >
+            <Filter size={18}/> Filtros
+          </button>
+          
+          <button onClick={() => setIsModalOpen(true)} className="bg-sow-green text-sow-dark px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:brightness-90">
+            <Plus size={18}/> Novo Pedido
+          </button>
         </div>
       </div>
+
+      {/* Painel de Filtros Expansível */}
+      {showFilters && (
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-2">
+          
+          {/* Filtro por Cliente */}
+          <div>
+            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Filtrar por Cliente</label>
+            <select 
+              className="w-full p-2 border rounded text-sm bg-white"
+              value={filterClient}
+              onChange={(e) => setFilterClient(e.target.value)}
+            >
+              <option value="Todos">Todos os Clientes</option>
+              {clients.map(c => <option key={c.id} value={c.id}>{c.company_name || c.name}</option>)}
+            </select>
+          </div>
+
+          {/* Filtro por Status */}
+          <div>
+            <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Filtrar por Status</label>
+            <select 
+              className="w-full p-2 border rounded text-sm bg-white"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+            >
+              <option value="Todos">Todos os Status</option>
+              <option value="Atras.">🚨 Atrasados</option>
+              <option value="Pendente">⏳ Pendentes</option>
+              <option value="Andam.">🔵 Em Andamento</option>
+              <option value="OK">✅ OK (Concluídos)</option>
+            </select>
+          </div>
+
+          {/* Botão Limpar */}
+          <div className="flex items-end">
+            <button 
+              onClick={() => { setFilterClient('Todos'); setFilterStatus('Todos'); setSearchTerm(''); }}
+              className="px-4 py-2 text-red-500 text-sm font-bold hover:bg-red-50 rounded-lg flex items-center gap-2"
+            >
+              <X size={16}/> Limpar Filtros
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
         <div className="overflow-x-auto custom-scrollbar pb-32">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50 text-xs font-bold text-gray-500 uppercase leading-normal">
-                {/* CORREÇÃO ITEM 1: Removida a coluna Origem Mod. */}
                 <th className="p-3 min-w-[180px] border-b border-r z-10 sticky left-0 bg-gray-50" rowSpan={2}>Pedido / Cliente</th>
                 <th className="p-3 min-w-[140px] border-b border-r" rowSpan={2}>Produto</th>
                 <th className="p-3 text-center border-b border-r" rowSpan={2}>Qtd</th>
@@ -164,57 +252,64 @@ const Production: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
-              {orders.map((order) => (
-                <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="p-3 border-r sticky left-0 bg-white z-10 group-hover:bg-gray-50">
-                    <div className="font-bold text-sow-dark">{order.order_number}</div>
-                    <div className="text-xs text-gray-500 truncate">{order.clients?.company_name || order.clients?.name}</div>
+              {filteredOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={20} className="p-8 text-center text-gray-500">
+                    Nenhum pedido encontrado com os filtros atuais.
                   </td>
-                  <td className="p-3 border-r text-gray-700 font-medium truncate max-w-[140px]" title={order.product_name}>{order.product_name}</td>
-                  <td className="p-3 border-r text-center font-bold">{order.quantity}</td>
-                  
-                  {/* Etapas */}
-                  {stageColumns.map(stage => {
-                    const stageData = order.stages?.[stage.key as keyof typeof order.stages];
-                    return (
-                      <React.Fragment key={stage.key}>
-                        <td className="p-2 border-r">
-                          <EditableSupplierCell 
-                            current={stageData?.provider} 
-                            category={stage.category}
-                            stageKey={stage.key}
-                            suppliers={suppliers}
-                            onUpdate={(val) => updateOrderStage(order.id, stage.key, 'provider', val)}
-                          />
-                        </td>
-                        <td className="p-2 border-r">
-                          <EditableDateCell 
-                            date={stageData?.date_in}
-                            onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_in', val)}
-                          />
-                        </td>
-                        <td className="p-2 border-r">
-                          <EditableDateCell 
-                            date={stageData?.date_out}
-                            onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_out', val)}
-                          />
-                        </td>
-                        <td className="p-2 border-r text-center">
-                          <EditableStatusCell 
-                            status={stageData?.status}
-                            onUpdate={(val) => updateOrderStage(order.id, stage.key, 'status', val)}
-                          />
-                        </td>
-                      </React.Fragment>
-                    );
-                  })}
                 </tr>
-              ))}
+              ) : (
+                filteredOrders.map((order) => (
+                  <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="p-3 border-r sticky left-0 bg-white z-10 group-hover:bg-gray-50">
+                      <div className="font-bold text-sow-dark">{order.order_number}</div>
+                      <div className="text-xs text-gray-500 truncate">{order.clients?.company_name || order.clients?.name}</div>
+                    </td>
+                    <td className="p-3 border-r text-gray-700 font-medium truncate max-w-[140px]" title={order.product_name}>{order.product_name}</td>
+                    <td className="p-3 border-r text-center font-bold">{order.quantity}</td>
+                    
+                    {stageColumns.map(stage => {
+                      const stageData = order.stages?.[stage.key as keyof typeof order.stages];
+                      return (
+                        <React.Fragment key={stage.key}>
+                          <td className="p-2 border-r">
+                            <EditableSupplierCell 
+                              current={stageData?.provider} 
+                              category={stage.category}
+                              stageKey={stage.key}
+                              suppliers={suppliers}
+                              onUpdate={(val) => updateOrderStage(order.id, stage.key, 'provider', val)}
+                            />
+                          </td>
+                          <td className="p-2 border-r">
+                            <EditableDateCell 
+                              date={stageData?.date_in}
+                              onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_in', val)}
+                            />
+                          </td>
+                          <td className="p-2 border-r">
+                            <EditableDateCell 
+                              date={stageData?.date_out}
+                              onUpdate={(val) => updateOrderStage(order.id, stage.key, 'date_out', val)}
+                            />
+                          </td>
+                          <td className="p-2 border-r text-center">
+                            <EditableStatusCell 
+                              status={stageData?.status}
+                              onUpdate={(val) => updateOrderStage(order.id, stage.key, 'status', val)}
+                            />
+                          </td>
+                        </React.Fragment>
+                      );
+                    })}
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
         <div className="bg-gray-50 p-3 border-t border-gray-200 text-xs text-gray-500">
-          Mostrando {orders.length} pedidos
+          Mostrando {filteredOrders.length} pedidos
         </div>
       </div>
 
