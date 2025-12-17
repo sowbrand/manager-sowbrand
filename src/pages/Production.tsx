@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Filter, X, Download, Printer, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Plus, Search, Filter, Download, Printer, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Clock } from 'lucide-react'; // REMOVIDO: X
 import { supabase } from '../supabaseClient';
 import type { ProductionOrder, Client, Supplier } from '../types';
 import { STATUS_OPTIONS } from '../constants';
 import * as XLSX from 'xlsx';
 
-// --- Componentes de Edição (Mantidos para o detalhe) ---
+// --- Componentes de Edição ---
 
 const EditableStatusCell = ({ status, onUpdate }: { status: string | undefined, onUpdate: (val: string) => void }) => {
   const currentStatus = STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0];
@@ -77,7 +77,7 @@ const Production: React.FC = () => {
   
   // Controle de Interface
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
-  const [activeTabFilter, setActiveTabFilter] = useState('Todos'); // Filtros rápidos
+  const [activeTabFilter, setActiveTabFilter] = useState('Todos'); 
   const [searchTerm, setSearchTerm] = useState('');
 
   const [newOrder, setNewOrder] = useState({ order_number: '', client_id: '', product_name: '', quantity: 0 });
@@ -130,7 +130,7 @@ const Production: React.FC = () => {
     if (!error) { setIsModalOpen(false); fetchData(); setNewOrder({ order_number: '', client_id: '', product_name: '', quantity: 0 }); }
   };
 
-  // --- Lógica de Filtros Rápidos (Pills) ---
+  // --- Lógica de Filtros ---
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
       order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -141,14 +141,13 @@ const Production: React.FC = () => {
     if (activeTabFilter !== 'Todos') {
       if (!order.stages) matchesTab = false;
       else {
-        // Verifica se ALGUMA etapa corresponde ao status do filtro
         matchesTab = Object.values(order.stages).some((stage: any) => stage.status === activeTabFilter);
       }
     }
     return matchesSearch && matchesTab;
   });
 
-  // --- Exportação Excel Formatada ---
+  // --- Exportação Excel ---
   const exportToExcel = () => {
     const dataToExport = filteredOrders.map(order => {
       const row: any = {
@@ -170,8 +169,8 @@ const Production: React.FC = () => {
     
     // Ajuste de largura das colunas
     const wscols = [
-      { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 5 }, // Info basica
-      ...stageColumns.flatMap(() => [{ wch: 12 }, { wch: 15 }, { wch: 12 }]) // Colunas de etapas
+      { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 5 }, 
+      ...stageColumns.flatMap(() => [{ wch: 12 }, { wch: 15 }, { wch: 12 }]) 
     ];
     worksheet['!cols'] = wscols;
 
@@ -185,7 +184,6 @@ const Production: React.FC = () => {
     else setExpandedOrderId(id);
   };
 
-  // Helper para pegar a cor da bolinha de status no resumo
   const getStatusColor = (status: string | undefined) => {
     if (status === 'OK') return 'bg-green-500';
     if (status === 'Atras.') return 'bg-red-500';
@@ -195,7 +193,7 @@ const Production: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* CSS Específico para Impressão (Resolve o PDF cortado) */}
+      {/* CSS Específico para Impressão */}
       <style>{`
         @media print {
           @page { size: landscape; margin: 5mm; }
@@ -203,7 +201,6 @@ const Production: React.FC = () => {
           #production-print-area, #production-print-area * { visibility: visible; }
           #production-print-area { position: absolute; left: 0; top: 0; width: 100%; }
           .no-print { display: none !important; }
-          /* Transforma o accordion em blocos visíveis para o PDF */
           .print-block { display: block !important; page-break-inside: avoid; border: 1px solid #ddd; margin-bottom: 10px; padding: 10px; border-radius: 8px; }
           .print-hidden { display: none !important; }
         }
@@ -234,7 +231,7 @@ const Production: React.FC = () => {
         </div>
       </div>
 
-      {/* Filtros Rápidos (Pills) */}
+      {/* Filtros Rápidos */}
       <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar no-print">
         {[
           { label: 'Todos', val: 'Todos', icon: Filter },
@@ -266,7 +263,7 @@ const Production: React.FC = () => {
           
           return (
             <div key={order.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden print-block">
-              {/* Cabeçalho do Card (Visão Resumida) */}
+              {/* Cabeçalho do Card */}
               <div 
                 onClick={() => toggleRow(order.id)}
                 className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 cursor-pointer hover:bg-gray-50 transition-colors"
@@ -282,7 +279,7 @@ const Production: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Status Visual (Bolinhas) - Escondido ao imprimir se quiser só o detalhe, mas deixei visível */}
+                {/* Status Visual (Bolinhas) */}
                 <div className="flex items-center gap-1 overflow-x-auto w-full md:w-auto no-print">
                   {stageColumns.map(stage => {
                     const status = order.stages?.[stage.key as keyof typeof order.stages]?.status;
@@ -295,7 +292,7 @@ const Production: React.FC = () => {
                   })}
                 </div>
 
-                {/* Quantidade e Seta */}
+                {/* Quantidade */}
                 <div className="flex items-center gap-6 md:justify-end w-full md:w-auto">
                   <div className="text-right">
                     <span className="text-xs text-gray-400 uppercase font-bold block">Qtd</span>
@@ -308,7 +305,7 @@ const Production: React.FC = () => {
               </div>
 
               {/* Área de Detalhes (Expandida) */}
-              {(isExpanded || true) && ( // O "|| true" é um truque para o CSS de impressão funcionar (veja o estilo .print-block)
+              {(isExpanded || true) && ( 
                 <div className={`border-t border-gray-100 bg-gray-50 p-4 ${isExpanded ? 'block' : 'hidden print:block'}`}>
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                     {stageColumns.map(stage => {
