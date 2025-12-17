@@ -9,7 +9,7 @@ import { gapi } from 'gapi-script';
 // --- CONFIGURAÇÃO DO GOOGLE DRIVE ---
 // ⚠️ CERTIFIQUE-SE QUE SUAS CHAVES ESTÃO AQUI:
 const CLIENT_ID = "839855666704-3mb0lgpmrk2mi4a812d6q2p7rtukem9f.apps.googleusercontent.com"; 
-const API_KEY = "CAIzaSyCljCB6lkuZCA-1eNRtwie9k5KwQ8X5IB0"; 
+const API_KEY = "AIzaSyCljCB6lkuZCA-1eNRtwie9k5KwQ8X5IB0"; 
 const SPREADSHEET_ID = "c1nK9T3KK0wGI8sb8uJx_lJ2junAs1U_R-Xyz1KovP4"; 
 
 const SCOPES = "https://www.googleapis.com/auth/spreadsheets"; 
