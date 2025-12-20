@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, ShoppingBag, Users, Settings, LogOut, 
-  Menu, X, Truck 
+  Menu, X, Truck, Grid 
 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { DEFAULT_COMPANY_SETTINGS } from '../constants';
@@ -42,11 +42,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/home', label: 'Módulos', icon: Grid },
     { path: '/production', label: 'Gestão de Produção', icon: ShoppingBag },
     { path: '/clients', label: 'Clientes', icon: Users },
     { path: '/suppliers', label: 'Fornecedores', icon: Truck },
     { path: '/settings', label: 'Configurações', icon: Settings },
   ];
+
+  const pageTitles = navItems.reduce<Record<string, string>>((acc, item) => {
+    acc[item.path] = item.label;
+    return acc;
+  }, {
+    '/home': 'Home',
+    '/techpack': 'Ficha Técnica',
+    '/quote': 'Gerador de Orçamento',
+  });
 
   return (
     <div className="flex h-screen w-full bg-[#F3F4F6]">
@@ -106,7 +116,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         
         <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm shrink-0 z-20">
           <h1 className="text-base font-bold text-sow-dark capitalize">
-            {navItems.find(i => i.path === currentPath)?.label || 'Sistema'}
+            {pageTitles[currentPath] || 'Sistema'}
           </h1>
           
           <div className="flex items-center gap-3">

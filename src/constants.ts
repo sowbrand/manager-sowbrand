@@ -2,6 +2,7 @@ import {
   Shirt, Scissors, PenTool, Palette, Printer, Package,
   Factory, Stamp, Layers, Droplet // Novo ícone
 } from 'lucide-react';
+import type { CompanyInfo } from './types';
 
 export const DEFAULT_COMPANY_SETTINGS = {
   company_name: 'Sow Brand',
@@ -34,3 +35,40 @@ export const STATUS_OPTIONS = [
   { value: 'Atras.',    label: 'Atrasado',   color: 'bg-red-100 text-red-800 border-red-300' },
   { value: 'N/A',       label: 'Não se Aplica', color: 'bg-gray-50 text-gray-400 border-gray-200' }, // NOVO STATUS
 ];
+
+// ---- Orçamento / Ficha Técnica (herdados do sow-brand-manager) ----
+export const COMPANY_INFO: CompanyInfo = {
+  name: "Sow Brand",
+  cnpj: "26.224.938/0001-89",
+  contact: "(47) 99197-6744 | https://www.sowbrandbrasil.com.br/",
+  address: "Rua Fermino Görl, 115, Reta, São Francisco do Sul - SC, 89333-558"
+};
+
+export const SKU_MAP: Record<string, string> = {
+  'Desenvolvimento de Marca': 'DESMAR',
+  'Private Label': 'PRILAB',
+  'Personalização': 'PER',
+  'Consultoria': 'CON',
+  'Mentoria': 'MEN',
+};
+
+export const PRIVATE_LABEL_OPTIONS = [
+  "Camiseta Oversized",
+  "Camiseta Streetwear",
+  "Camiseta Casual",
+  "Camiseta Slim",
+  "Camiseta Feminina"
+];
+
+export const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  }).format(value);
+};
+
+export const formatDate = (date: Date) => {
+  return new Intl.DateTimeFormat('pt-BR').format(date);
+};
+
+export const CHART_COLORS = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];

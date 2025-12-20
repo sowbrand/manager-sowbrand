@@ -1,3 +1,80 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Configuração da Folha A4 na Tela */
+.a4-page {
+  width: 210mm;
+  height: 296mm; /* altura A4 - 1mm para segurança */
+  margin: 0 auto;
+  background: white;
+  position: relative;
+  overflow: hidden;
+  page-break-after: always;
+}
+
+/* A última folha não deve criar nova página em branco */
+.a4-page:last-child {
+  page-break-after: avoid;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  body {
+    background: white;
+    margin: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .no-print, .no-print * {
+    display: none !important;
+  }
+
+  /* Remove barras de rolagem e margens extras */
+  #root, .print-container {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: visible !important;
+  }
+
+  .a4-page {
+    width: 210mm !important;
+    height: 296mm !important;
+    margin: 0 !important;
+    padding: 10mm !important;
+    border: none !important;
+    box-shadow: none !important;
+    page-break-after: always;
+    page-break-inside: avoid;
+  }
+
+  /* Evita página fantasma no final */
+  .a4-page:last-of-type {
+    page-break-after: avoid !important;
+  }
+}
+
+/* Custom Scrollbar para Layout */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}

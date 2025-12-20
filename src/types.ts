@@ -66,3 +66,93 @@ export interface CompanySettings {
   footer_text: string;
   logo_url?: string;
 }
+
+// --- Ficha Técnica & Orçamento ---
+export interface PrintLocation {
+  name: string;
+  art: string;
+  dimension: string;
+  position: string;
+  pantone: string;
+  technique: string;
+}
+
+export interface GridRow {
+  id: string;
+  color: string;
+  sizes: {
+    P: number;
+    M: number;
+    G: number;
+    GG: number;
+    XG: number;
+  };
+}
+
+export interface TechPackData {
+  reference: string;
+  collection: string;
+  product: string;
+  responsible: string;
+  date: string;
+  technicalDrawing: string | null;
+  imageFront: string | null;
+  imageBack: string | null;
+  productionGrid: GridRow[];
+  fabric: string;
+  fabricWidth: string;
+  fabricYield: string;
+  restTime: boolean;
+  machineClosing: string;
+  machineHem: string;
+  machineReinforcement: string;
+  needleThread: string;
+  looperThread: string;
+  hemSize: string;
+  sleeveHem: string;
+  collarMaterial: string;
+  collarHeight: string;
+  reinforcementType: string;
+  obsCostura: string;
+  printSpecs: {
+    technique: string;
+    touch: string;
+  };
+  printLocations: {
+    local1: PrintLocation;
+    local2: PrintLocation;
+    local3: PrintLocation;
+  };
+  dtfTemp: string;
+  dtfTime: string;
+  dtfPressure: string;
+  dtfPeel: string;
+  variants: string;
+}
+
+export interface QuoteItem {
+  id: string;
+  service: string;
+  sku: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+export interface QuoteData {
+  orderNumber: string;
+  orderDate: string;
+  deliveryDate: string;
+  clientName: string;
+  clientAddress: string;
+  clientContact: string;
+  items: QuoteItem[];
+  observations: string;
+}
+
+export interface CompanyInfo {
+  name: string;
+  cnpj: string;
+  contact: string;
+  address: string;
+}
